@@ -71,6 +71,37 @@ app.get('/api/applications', async (req, res) => {
   }
 });
 
+// API endpoint to add new application
+app.post('/api/applications', async (req, res) => {
+  try {
+    const { appName } = req.body;
+    
+    if (!appName || !appName.trim()) {
+      return res.status(400).json({ success: false, message: 'Application name is required' });
+    }
+    
+    const [result] = await pool.execute(
+      'INSERT INTO app_identifier (app_name) VALUES (?)',
+      [appName.trim()]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Application added successfully',
+      data: { id: result.insertId, appName: appName.trim() }
+    });
+  } catch (error) {
+    console.error('Error adding application:', error.message);
+    
+    // Check for duplicate entry
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ success: false, message: 'Application name already exists' });
+    }
+    
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ==== Start Server ====
 (async () => {
   try {

@@ -20,15 +20,11 @@ class App {
     const addAppCard = new AddAppCard();
     const dictionaryUploadCard = new DictionaryUploadCard();
     const addSuccessRateCard = new AddSuccessRateCard();
-    const addDetailedReportCard = new AddDetailedReportCard();
-    const quickActionsCard = new QuickActionsCard();
 
     // Add cards to container
     this.cardContainer.addCard(addAppCard);
     this.cardContainer.addCard(dictionaryUploadCard, { className: 'card-large' });
     this.cardContainer.addCard(addSuccessRateCard);
-    this.cardContainer.addCard(addDetailedReportCard);
-    this.cardContainer.addCard(quickActionsCard);
   }
 
   attachGlobalEventListeners() {
@@ -45,13 +41,6 @@ class App {
       this.handleSuccessRateFileSelected(e.detail.file);
     });
 
-    document.addEventListener('detailedReportFilesSelected', (e) => {
-      this.handleDetailedReportFilesSelected(e.detail.files);
-    });
-
-    document.addEventListener('quickActionClicked', (e) => {
-      this.handleQuickActionClicked(e.detail.action);
-    });
   }
 
   handleAppAdded(appName) {
@@ -69,15 +58,6 @@ class App {
     // Here you could add logic to process the success rate document
   }
 
-  handleDetailedReportFilesSelected(files) {
-    console.log('Detailed report files selected:', files.map(f => f.name));
-    // Here you could add logic to process the detailed report documents
-  }
-
-  handleQuickActionClicked(action) {
-    console.log('Quick action clicked:', action);
-    // Here you could add routing logic or other app-specific actions
-  }
 
   render(targetElement) {
     if (targetElement) {

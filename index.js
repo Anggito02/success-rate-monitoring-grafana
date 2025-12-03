@@ -60,6 +60,17 @@ app.get('/api/db-status', async (req, res) => {
   }
 });
 
+// API endpoint to get list of applications
+app.get('/api/applications', async (req, res) => {
+  try {
+    const [rows] = await pool.execute('SELECT app_name FROM app_identifier');
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching applications:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ==== Start Server ====
 (async () => {
   try {

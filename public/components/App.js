@@ -20,8 +20,10 @@ class App {
     const addAppCard = new AddAppCard();
     const dictionaryUploadCard = new DictionaryUploadCard();
     const addSuccessRateCard = new AddSuccessRateCard();
+    const appListCard = new AppListCard();
 
     // Add cards to container
+    this.cardContainer.addCard(appListCard, { className: 'card-tall' });
     this.cardContainer.addCard(addAppCard);
     this.cardContainer.addCard(dictionaryUploadCard, { className: 'card-large' });
     this.cardContainer.addCard(addSuccessRateCard);

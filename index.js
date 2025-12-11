@@ -14,6 +14,10 @@ const port = 3000;
 app.use(express.static('public'));
 app.use(express.json());
 
+// Configure Multer for memory storage
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
 // ==== MySQL Connection Pool ====
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -63,7 +67,7 @@ app.get('/api/db-status', async (req, res) => {
 // API endpoint to get list of applications
 app.get('/api/applications', async (req, res) => {
     try {
-        const [rows] = await pool.execute('SELECT app_name FROM app_identifier');
+        const [rows] = await pool.execute('SELECT id, app_name FROM app_identifier ORDER BY app_name');
         res.json({ success: true, data: rows });
     } catch (error) {
         console.error('Error fetching applications:', error.message);
@@ -101,6 +105,19 @@ app.post('/api/restart-db', async (req, res) => {
       )
     `);
 
+        // Insert apps
+        await connection.execute(`
+            INSERT INTO app_identifier(app_name)
+            VALUES
+                ('New MB'),
+                ('CMS'),
+                ('SMS Notif'),
+                ('QRIS'),
+                ('EDC Merchant'),
+                ('EDC Agent'),
+                ('Bale Korpora')
+            `)
+
         // Create app_success_rate table
         await connection.execute(`
       CREATE TABLE app_success_rate (
@@ -115,7 +132,7 @@ app.post('/api/restart-db', async (req, res) => {
         total_nominal DECIMAL(20, 2),
         total_biaya_admin DECIMAL(20, 2),
         status_transaksi ENUM('sukses', 'failed', 'pending'),
-        error_type ENUM('S', 'N'),
+        error_type ENUM('S', 'N', 'Sukses'),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
@@ -125,9 +142,12 @@ app.post('/api/restart-db', async (req, res) => {
         await connection.execute(`
       CREATE TABLE response_code_dictionary (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        jenis_transaksi VARCHAR(255) NOT NULL,
+        id_app_identifier INT NOT NULL,
+        jenis_transaksi VARCHAR(255),
         rc VARCHAR(50),
-        error_type ENUM('S', 'N') NOT NULL
+        error_type ENUM('S', 'N', 'Sukses') NOT NULL,
+        FOREIGN KEY (id_app_identifier) REFERENCES app_identifier(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_dictionary_entry (id_app_identifier, jenis_transaksi, rc)
       )
     `);
 
@@ -172,6 +192,166 @@ app.post('/api/applications', async (req, res) => {
         }
 
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API endpoint to upload dictionary file
+app.post('/api/upload-dictionary', upload.single('dictionaryFile'), async (req, res) => {
+    try {
+        // Check if file was uploaded
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        // Get application ID (required)
+        const { selectedApplicationId } = req.body;
+
+        if (!selectedApplicationId || isNaN(parseInt(selectedApplicationId))) {
+            return res.status(400).json({ success: false, message: 'Valid application selection is required' });
+        }
+
+        const applicationId = parseInt(selectedApplicationId);
+
+        // Parse Excel file
+        const data = new Uint8Array(req.file.buffer);
+        const workbook = xlsx.read(data, { type: 'array' });
+
+        if (workbook.SheetNames.length === 0) {
+            return res.status(400).json({ success: false, message: 'Excel file contains no worksheets' });
+        }
+
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Get headers from first row
+        const range = xlsx.utils.decode_range(worksheet['!ref']);
+        const headers = [];
+
+        for (let col = range.s.c; col <= range.e.c; col++) {
+            const cellAddress = xlsx.utils.encode_cell({ r: 0, c: col });
+            const cell = worksheet[cellAddress];
+            if (cell && cell.v) {
+                headers.push(String(cell.v).trim());
+            }
+        }
+
+        // Validate columns
+        if (headers.length !== 3) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid column count. Expected 3 columns, got ${headers.length}`
+            });
+        }
+
+        // Check required columns (case-insensitive)
+        const normalizedHeaders = headers.map(h => h.toLowerCase());
+        const requiredColumns = ['jenis transaksi', 'rc', 's/n'];
+
+        const missingColumns = requiredColumns.filter(required =>
+            !normalizedHeaders.includes(required)
+        );
+
+        if (missingColumns.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Missing required columns: ${missingColumns.join(', ')}`
+            });
+        }
+
+        // Find column indices
+        const jenisTransaksiIndex = normalizedHeaders.indexOf('jenis transaksi');
+        const rcIndex = normalizedHeaders.indexOf('rc');
+        const snIndex = normalizedHeaders.indexOf('s/n');
+
+        // Collect data from rows (skip header row)
+        const dictionaryData = [];
+
+        for (let rowNum = 1; rowNum <= range.e.r; rowNum++) {
+            const jenisTransaksiCell = worksheet[xlsx.utils.encode_cell({ r: rowNum, c: jenisTransaksiIndex })];
+            const rcCell = worksheet[xlsx.utils.encode_cell({ r: rowNum, c: rcIndex })];
+            const snCell = worksheet[xlsx.utils.encode_cell({ r: rowNum, c: snIndex })];
+
+            const jenisTransaksi = jenisTransaksiCell && jenisTransaksiCell.v ? String(jenisTransaksiCell.v).trim() : '';
+            const rc = rcCell && rcCell.v ? String(rcCell.v).trim() : '';
+            const rawSn = snCell && snCell.v ? String(snCell.v).trim().toUpperCase() : '';
+
+            // Map S/N values to error_type
+            let errorType = null;
+            if (rawSn === 'S') {
+                errorType = 'S';
+            } else if (rawSn === 'N') {
+                errorType = 'N';
+            } else if (rawSn === 'SUKSES' || rawSn === 'SUKSES' || rawSn === 'SUCCESS' || rawSn === 'BERHASIL') {
+                errorType = 'Sukses';
+            }
+
+            // Validate row data - skip if missing error_type (only error_type is required now, jenis_transaksi and rc can be empty)
+            if (!errorType) {
+                continue; // Skip rows without valid error_type
+            }
+
+            if (errorType) {
+                dictionaryData.push({
+                    jenis_transaksi: jenisTransaksi,
+                    rc: rc,
+                    error_type: errorType
+                });
+            }
+        }
+
+        if (dictionaryData.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid dictionary data found in the file' });
+        }
+
+        // Insert data into database
+        const connection = await pool.getConnection();
+        try {
+            // First, verify the application exists
+            const [appResult] = await connection.execute(
+                'SELECT app_name FROM app_identifier WHERE id = ?',
+                [applicationId]
+            );
+
+            if (appResult.length === 0) {
+                return res.status(400).json({ success: false, message: 'Selected application does not exist' });
+            }
+
+            const applicationName = appResult[0].app_name;
+
+            // Use INSERT IGNORE or ON DUPLICATE KEY UPDATE to handle duplicates
+            const insertQuery = `
+                INSERT INTO response_code_dictionary (id_app_identifier, jenis_transaksi, rc, error_type)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                error_type = VALUES(error_type)
+            `;
+
+            for (const entry of dictionaryData) {
+                await connection.execute(insertQuery, [
+                    applicationId,
+                    entry.jenis_transaksi,
+                    entry.rc,
+                    entry.error_type
+                ]);
+            }
+
+            res.json({
+                success: true,
+                message: `Dictionary uploaded successfully. ${dictionaryData.length} entries processed.`,
+                data: {
+                    entriesProcessed: dictionaryData.length,
+                    applicationId: applicationId,
+                    applicationName: applicationName
+                }
+            });
+
+        } finally {
+            connection.release();
+        }
+
+    } catch (error) {
+        console.error('Error uploading dictionary:', error);
+        res.status(500).json({ success: false, message: 'Error processing dictionary file: ' + error.message });
     }
 });
 

@@ -1,16 +1,16 @@
 // AppListCard Component
 class AppListCard {
-  constructor() {
-    this.element = this.createElement();
-    this.applications = [];
-    this.loadApplications();
-  }
+    constructor() {
+        this.element = this.createElement();
+        this.applications = [];
+        this.loadApplications();
+    }
 
-  createElement() {
-    const cardDiv = document.createElement('div');
-    cardDiv.className = 'card card-tall';
-    
-    cardDiv.innerHTML = `
+    createElement() {
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card card-tall';
+
+        cardDiv.innerHTML = `
       <h2>Application List</h2>
       <p>List of registered applications</p>
       
@@ -22,20 +22,20 @@ class AppListCard {
         Refresh List
       </button>
     `;
-    
-    // Add styles for the app list
-    this.addStyles();
-    
-    return cardDiv;
-  }
 
-  addStyles() {
-    // Check if styles already exist
-    if (document.getElementById('appListCardStyles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'appListCardStyles';
-    style.textContent = `
+        // Add styles for the app list
+        this.addStyles();
+
+        return cardDiv;
+    }
+
+    addStyles() {
+        // Check if styles already exist
+        if (document.getElementById('appListCardStyles')) return;
+
+        const style = document.createElement('style');
+        style.id = 'appListCardStyles';
+        style.textContent = `
       .app-list-container {
         max-height: 300px;
         overflow-y: auto;
@@ -120,43 +120,43 @@ class AppListCard {
         margin-bottom: 12px;
       }
     `;
-    document.head.appendChild(style);
-  }
-
-  async loadApplications() {
-    const container = this.element.querySelector('#appListContainer');
-    
-    try {
-      container.innerHTML = '<div class="loading-spinner">Loading applications...</div>';
-      
-      const response = await fetch('/api/applications');
-      const result = await response.json();
-      
-      if (result.success) {
-        this.applications = result.data;
-        this.renderApplicationList();
-      } else {
-        throw new Error(result.message || 'Failed to load applications');
-      }
-    } catch (error) {
-      container.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
-      console.error('Error loading applications:', error);
+        document.head.appendChild(style);
     }
-    
-    // Attach refresh button listener after loading
-    this.attachEventListeners();
-  }
 
-  renderApplicationList() {
-    const container = this.element.querySelector('#appListContainer');
-    
-    if (this.applications.length === 0) {
-      container.innerHTML = '<div class="empty-message">No applications found</div>';
-      return;
+    async loadApplications() {
+        const container = this.element.querySelector('#appListContainer');
+
+        try {
+            container.innerHTML = '<div class="loading-spinner">Loading applications...</div>';
+
+            const response = await fetch('/api/applications');
+            const result = await response.json();
+
+            if (result.success) {
+                this.applications = result.data;
+                this.renderApplicationList();
+            } else {
+                throw new Error(result.message || 'Failed to load applications');
+            }
+        } catch (error) {
+            container.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+            console.error('Error loading applications:', error);
+        }
+
+        // Attach refresh button listener after loading
+        this.attachEventListeners();
     }
-    
-    const listHTML = `
-      <div class="app-count">Total: ${this.applications.length} applications</div>
+
+    renderApplicationList() {
+        const container = this.element.querySelector('#appListContainer');
+
+        if (this.applications.length === 0) {
+            container.innerHTML = '<div class="empty-message">No applications found</div>';
+            return;
+        }
+
+        const listHTML = `
+      <div class="app-count text-center">Total: ${this.applications.length} applications</div>
       <ul class="app-list">
         ${this.applications.map(app => `
           <li class="app-list-item">
@@ -166,44 +166,44 @@ class AppListCard {
         `).join('')}
       </ul>
     `;
-    
-    container.innerHTML = listHTML;
-  }
 
-  getInitials(name) {
-    if (!name) return '?';
-    return name.split(' ')
-      .map(word => word.charAt(0).toUpperCase())
-      .slice(0, 2)
-      .join('');
-  }
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  attachEventListeners() {
-    const refreshBtn = this.element.querySelector('#refreshAppListBtn');
-    
-    if (refreshBtn) {
-      // Remove existing listeners by cloning
-      const newBtn = refreshBtn.cloneNode(true);
-      refreshBtn.parentNode.replaceChild(newBtn, refreshBtn);
-      
-      newBtn.addEventListener('click', () => {
-        this.loadApplications();
-      });
+        container.innerHTML = listHTML;
     }
-  }
 
-  render() {
-    return this.element;
-  }
+    getInitials(name) {
+        if (!name) return '?';
+        return name.split(' ')
+            .map(word => word.charAt(0).toUpperCase())
+            .slice(0, 2)
+            .join('');
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    attachEventListeners() {
+        const refreshBtn = this.element.querySelector('#refreshAppListBtn');
+
+        if (refreshBtn) {
+            // Remove existing listeners by cloning
+            const newBtn = refreshBtn.cloneNode(true);
+            refreshBtn.parentNode.replaceChild(newBtn, refreshBtn);
+
+            newBtn.addEventListener('click', () => {
+                this.loadApplications();
+            });
+        }
+    }
+
+    render() {
+        return this.element;
+    }
 }
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = AppListCard;
+    module.exports = AppListCard;
 }

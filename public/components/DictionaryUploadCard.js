@@ -2,8 +2,43 @@
 class DictionaryUploadCard {
     constructor() {
         this.element = this.createElement();
-        this.attachEventListeners();
         this.requiredColumns = ['Jenis Transaksi', 'RC', 'S/N'];
+        this.selectedFile = null;
+        this.loadApplications();
+    }
+
+    async loadApplications() {
+        try {
+            const response = await fetch('/api/applications');
+            const result = await response.json();
+
+            if (result.success) {
+                this.populateApplicationDropdown(result.data);
+            } else {
+                console.error('Failed to load applications:', result.message);
+            }
+        } catch (error) {
+            console.error('Error loading applications:', error);
+        }
+
+        // Attach event listeners after loading applications
+        this.attachEventListeners();
+    }
+
+    populateApplicationDropdown(applications) {
+        const select = this.element.querySelector('#applicationSelect');
+        const defaultOption = select.querySelector('option[value=""]');
+
+        // Clear existing options except default
+        select.innerHTML = '';
+        select.appendChild(defaultOption);
+
+        applications.forEach(app => {
+            const option = document.createElement('option');
+            option.value = app.id;
+            option.textContent = app.app_name;
+            select.appendChild(option);
+        });
     }
 
     createElement() {
@@ -13,32 +48,28 @@ class DictionaryUploadCard {
         cardDiv.innerHTML = `
       <h2>Add Dictionary Document</h2>
       <p>Upload dictionary file (Excel with columns: Jenis Transaksi, RC, S/N)</p>
-      
+
       <div class="form-group">
-        <label for="applicationName">Application Name:</label>
-        <input 
-          type="text" 
-          id="applicationName" 
-          name="applicationName" 
-          placeholder="Enter application name"
-          required
-        />
+        <label for="applicationSelect">Application:</label>
+        <select id="applicationSelect" name="applicationSelect" required>
+          <option value="">-- Select Application --</option>
+        </select>
       </div>
-      
+
       <div class="upload-area" id="uploadArea">
         <p>Drag & drop your Excel file here or click to browse</p>
-        <input 
-          type="file" 
-          id="dictionaryFile" 
-          name="dictionaryFile" 
+        <input
+          type="file"
+          id="dictionaryFile"
+          name="dictionaryFile"
           accept=".xlsx,.xls"
           style="display: none;"
         />
       </div>
-      
+
       <div id="validationMessage" style="margin-bottom: 16px; display: none;"></div>
-      
-      <button type="button" id="uploadBtn">Upload Dictionary</button>
+
+      <button type="button" id="uploadBtn" disabled>Upload Dictionary</button>
     `;
 
         return cardDiv;
@@ -48,13 +79,14 @@ class DictionaryUploadCard {
         const uploadArea = this.element.querySelector('#uploadArea');
         const fileInput = this.element.querySelector('#dictionaryFile');
         const uploadBtn = this.element.querySelector('#uploadBtn');
+        const applicationSelect = this.element.querySelector('#applicationSelect');
 
-        // Button click
+        // Upload button click - now performs the actual upload
         uploadBtn.addEventListener('click', () => {
-            fileInput.click();
+            this.performUpload();
         });
 
-        // Upload area click
+        // Upload area click - opens file dialog
         uploadArea.addEventListener('click', () => {
             fileInput.click();
         });
@@ -96,6 +128,19 @@ class DictionaryUploadCard {
                 }
             }
         });
+
+        // Application select change
+        applicationSelect.addEventListener('change', () => {
+            this.updateUploadButtonState();
+        });
+    }
+
+    updateUploadButtonState() {
+        const uploadBtn = this.element.querySelector('#uploadBtn');
+        const applicationSelected = this.getSelectedApplicationId();
+        const fileSelected = this.selectedFile !== null;
+
+        uploadBtn.disabled = !(applicationSelected && fileSelected);
     }
 
     isValidExcelFile(file) {
@@ -202,6 +247,11 @@ class DictionaryUploadCard {
 
     showValidationMessage(message, type) {
         const messageDiv = this.element.querySelector('#validationMessage');
+        if (!messageDiv) {
+            console.error('Validation message div not found!');
+            return;
+        }
+
         messageDiv.style.display = 'block';
         messageDiv.textContent = message;
 
@@ -254,35 +304,98 @@ class DictionaryUploadCard {
         this.attachEventListeners();
     }
 
-    onFileSelected(file) {
-        // Get application name value
-        const applicationName = this.element.querySelector('#applicationName').value;
-
-        // Emit custom event for file selected
-        const event = new CustomEvent('dictionaryFileSelected', {
-            detail: {
-                file,
-                applicationName
-            }
-        });
-        document.dispatchEvent(event);
-
-        // Default processing - can be overridden
-        console.log('Dictionary file selected:', file.name, 'Application Name:', applicationName);
+    async onFileSelected(file) {
+        // Store the selected file and update UI
+        this.selectedFile = file;
+        this.updateUploadButtonState();
+        this.showValidationMessage('File ready for upload. Select an application to enable upload.', 'success');
     }
 
-    // Method to get application name
-    getApplicationName() {
-        return this.element.querySelector('#applicationName').value;
+    async performUpload() {
+        const applicationId = this.getSelectedApplicationId();
+
+        if (!applicationId) {
+            this.showValidationError('Please select an application');
+            return;
+        }
+
+        if (!this.selectedFile) {
+            this.showValidationError('Please select a file to upload');
+            return;
+        }
+
+        const uploadBtn = this.element.querySelector('#uploadBtn');
+
+        try {
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            this.showValidationMessage('Uploading dictionary...', 'info');
+
+            const formData = new FormData();
+            formData.append('dictionaryFile', this.selectedFile);
+            formData.append('selectedApplicationId', applicationId);
+
+            const response = await fetch('/api/upload-dictionary', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                console.log('Upload successful:', result.message);
+                this.showValidationMessage(result.message, 'success');
+
+                // Emit custom event for successful upload
+                const event = new CustomEvent('dictionaryFileUploaded', {
+                    detail: {
+                        file: this.selectedFile,
+                        applicationId: result.data.applicationId,
+                        applicationName: result.data.applicationName,
+                        result
+                    }
+                });
+                document.dispatchEvent(event);
+
+                // Form will be manually reset by the user starting a new upload
+                console.log('Upload complete. User can start new upload when ready.');
+            } else {
+                throw new Error(result.message || 'Upload failed');
+            }
+
+        } catch (error) {
+            this.showValidationError(`Upload failed: ${error.message}`);
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload Dictionary';
+        }
+    }
+
+    // Method to get selected application ID
+    getSelectedApplicationId() {
+        const select = this.element.querySelector('#applicationSelect');
+        const value = select ? select.value : '';
+        return value && value !== '' ? value : null;
+    }
+
+    // Method to get selected application name
+    getSelectedApplicationName() {
+        const select = this.element.querySelector('#applicationSelect');
+        const selectedOption = select ? select.options[select.selectedIndex] : null;
+        return selectedOption && selectedOption.value !== '' ? selectedOption.textContent : null;
     }
 
     // Method to reset form
     resetForm() {
-        const applicationNameInput = this.element.querySelector('#applicationName');
+        const applicationSelect = this.element.querySelector('#applicationSelect');
         const fileInput = this.element.querySelector('#dictionaryFile');
 
-        applicationNameInput.value = '';
-        fileInput.value = '';
+        if (applicationSelect) applicationSelect.value = '';
+        if (fileInput) fileInput.value = '';
+
+        this.selectedFile = null;
+        this.updateUploadButtonState();
 
         this.hideValidationMessage();
         this.resetUploadArea();

@@ -2,11 +2,8 @@
 class AddSuccessRateCard {
     constructor() {
         this.element = this.createElement();
-        this.attachEventListeners();
         this.requiredColumns = [
             'Tanggal Transaksi',
-            'Bulan',
-            'Tahun',
             'Jenis Transaksi',
             'RC',
             'RC Description',
@@ -15,6 +12,42 @@ class AddSuccessRateCard {
             'Total Biaya Admin',
             'Status Transaksi'
         ];
+        this.selectedFile = null;
+        this.loadApplications();
+    }
+
+    async loadApplications() {
+        try {
+            const response = await fetch('/api/applications');
+            const result = await response.json();
+
+            if (result.success) {
+                this.populateApplicationDropdown(result.data);
+            } else {
+                console.error('Failed to load applications:', result.message);
+            }
+        } catch (error) {
+            console.error('Error loading applications:', error);
+        }
+
+        // Attach event listeners after loading applications
+        this.attachEventListeners();
+    }
+
+    populateApplicationDropdown(applications) {
+        const select = this.element.querySelector('#applicationSelect');
+        const defaultOption = select.querySelector('option[value=""]');
+
+        // Clear existing options except default
+        select.innerHTML = '';
+        select.appendChild(defaultOption);
+
+        applications.forEach(app => {
+            const option = document.createElement('option');
+            option.value = app.id;
+            option.textContent = app.app_name;
+            select.appendChild(option);
+        });
     }
 
     createElement() {
@@ -23,17 +56,13 @@ class AddSuccessRateCard {
 
         cardDiv.innerHTML = `
       <h2>Add Success Rate Document</h2>
-      <p>Upload Excel file with 10 required columns</p>
-      
+      <p>Upload Excel file with 8 required columns</p>
+
       <div class="form-group">
-        <label for="appNameInput">Application Name</label>
-        <input 
-          type="text" 
-          id="appNameInput" 
-          name="appName" 
-          placeholder="Enter application name"
-          class="form-input"
-        />
+        <label for="applicationSelect">Application:</label>
+        <select id="applicationSelect" name="applicationSelect" required>
+          <option value="">-- Select Application --</option>
+        </select>
       </div>
       
       <div class="upload-area" id="successRateUploadArea">
@@ -59,13 +88,14 @@ class AddSuccessRateCard {
         const uploadArea = this.element.querySelector('#successRateUploadArea');
         const fileInput = this.element.querySelector('#successRateFile');
         const uploadBtn = this.element.querySelector('#uploadSuccessRateBtn');
+        const applicationSelect = this.element.querySelector('#applicationSelect');
 
-        // Button click
+        // Upload button click - now performs the actual upload
         uploadBtn.addEventListener('click', () => {
-            fileInput.click();
+            this.performUpload();
         });
 
-        // Upload area click
+        // Upload area click - opens file dialog
         uploadArea.addEventListener('click', () => {
             fileInput.click();
         });
@@ -107,6 +137,19 @@ class AddSuccessRateCard {
                 }
             }
         });
+
+        // Application select change
+        applicationSelect.addEventListener('change', () => {
+            this.updateUploadButtonState();
+        });
+    }
+
+    updateUploadButtonState() {
+        const uploadBtn = this.element.querySelector('#uploadSuccessRateBtn');
+        const applicationSelected = this.getSelectedApplicationId();
+        const fileSelected = this.selectedFile !== null;
+
+        uploadBtn.disabled = !(applicationSelected && fileSelected);
     }
 
     isValidExcelFile(file) {
@@ -126,7 +169,7 @@ class AddSuccessRateCard {
                     fileInput.files = droppedFiles;
                 }
                 this.updateUploadArea(file.name);
-                this.showValidationMessage('File valid! All 10 columns verified.', 'success');
+                this.showValidationMessage('File valid! All 8 columns verified.', 'success');
                 this.onFileSelected(file);
             } else {
                 this.showValidationError(validationResult.error);
@@ -277,31 +320,99 @@ class AddSuccessRateCard {
         this.attachEventListeners();
     }
 
-    getAppName() {
-        const appNameInput = this.element.querySelector('#appNameInput');
-        return appNameInput ? appNameInput.value.trim() : '';
+    // Removed - now using application dropdown instead of text input
+
+    async onFileSelected(file) {
+        // Store the selected file and update UI
+        this.selectedFile = file;
+        this.updateUploadButtonState();
+        this.showValidationMessage('File ready for upload. Select an application to enable upload.', 'success');
     }
 
-    onFileSelected(file) {
-        const appName = this.getAppName();
+    async performUpload() {
+        const applicationId = this.getSelectedApplicationId();
 
-        // Emit custom event for success rate file selected
-        const event = new CustomEvent('successRateFileSelected', {
-            detail: { file, appName }
-        });
-        document.dispatchEvent(event);
+        if (!applicationId) {
+            this.showValidationError('Please select an application');
+            return;
+        }
 
-        // Default processing - can be overridden
-        console.log('Success Rate file selected:', file.name, 'App Name:', appName);
+        if (!this.selectedFile) {
+            this.showValidationError('Please select a file to upload');
+            return;
+        }
+
+        const uploadBtn = this.element.querySelector('#uploadSuccessRateBtn');
+
+        try {
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            this.showValidationMessage('Uploading success rate document...', 'info');
+
+            const formData = new FormData();
+            formData.append('successRateFile', this.selectedFile);
+            formData.append('selectedApplicationId', applicationId);
+
+            const response = await fetch('/api/upload-success-rate', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showValidationMessage(result.message, 'success');
+
+                // Emit custom event for successful upload
+                const event = new CustomEvent('successRateFileUploaded', {
+                    detail: {
+                        file: this.selectedFile,
+                        applicationId: result.data.applicationId,
+                        applicationName: result.data.applicationName,
+                        result
+                    }
+                });
+                document.dispatchEvent(event);
+
+                // Form will be manually reset by the user starting a new upload
+                console.log('Upload complete. User can start new upload when ready.');
+            } else {
+                throw new Error(result.message || 'Upload failed');
+            }
+
+        } catch (error) {
+            this.showValidationError(`Upload failed: ${error.message}`);
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload Document';
+        }
+    }
+
+    // Method to get selected application ID
+    getSelectedApplicationId() {
+        const select = this.element.querySelector('#applicationSelect');
+        const value = select ? select.value : '';
+        return value && value !== '' ? value : null;
+    }
+
+    // Method to get selected application name
+    getSelectedApplicationName() {
+        const select = this.element.querySelector('#applicationSelect');
+        const selectedOption = select ? select.options[select.selectedIndex] : null;
+        return selectedOption && selectedOption.value !== '' ? selectedOption.textContent : null;
     }
 
     // Method to reset form
     resetForm() {
-        const appNameInput = this.element.querySelector('#appNameInput');
+        const applicationSelect = this.element.querySelector('#applicationSelect');
         const fileInput = this.element.querySelector('#successRateFile');
 
-        if (appNameInput) appNameInput.value = '';
+        if (applicationSelect) applicationSelect.value = '';
         if (fileInput) fileInput.value = '';
+
+        this.selectedFile = null;
+        this.updateUploadButtonState();
 
         this.hideValidationMessage();
         this.resetUploadArea();

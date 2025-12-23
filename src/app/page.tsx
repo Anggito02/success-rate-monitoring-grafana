@@ -29,14 +29,14 @@ export default function Home() {
             <AppListCard />
           </div>
 
-          {/* Unmapped RC Card - Second column (spans 2 rows) */}
-          <div className="lg:col-span-2 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.15s' }}>
-            <UnmappedRcCard />
+          {/* Add App Card - Same height as AppListCard */}
+          <div className="lg:col-span-2 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.2s' }}>
+            <AddAppCard />
           </div>
 
-          {/* Add App Card - Top */}
-          <div className="lg:col-span-4 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.2s' }}>
-            <AddAppCard />
+          {/* Unmapped RC Card - Wide rectangle (spans 2 rows, wide) */}
+          <div className="lg:col-span-8 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.15s' }}>
+            <UnmappedRcCard />
           </div>
 
           {/* Dictionary Upload Card - Top right */}
@@ -62,13 +62,13 @@ export default function Home() {
             <AppListCard />
           </div>
 
-          {/* Add App Card */}
-          <div className="md:col-span-2 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.2s' }}>
+          {/* Add App Card - Compact */}
+          <div className="md:col-span-1 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.2s' }}>
             <AddAppCard />
           </div>
 
           {/* Dictionary Upload Card */}
-          <div className="md:col-span-2 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.3s' }}>
+          <div className="md:col-span-3 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.3s' }}>
             <DictionaryUploadCard />
           </div>
 
@@ -82,8 +82,8 @@ export default function Home() {
             <RestartDbCard />
           </div>
 
-          {/* Unmapped RC Card */}
-          <div className="md:col-span-4 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.6s' }}>
+          {/* Unmapped RC Card - Wide rectangle */}
+          <div className="md:col-span-4 md:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.6s' }}>
             <UnmappedRcCard />
           </div>
         </div>

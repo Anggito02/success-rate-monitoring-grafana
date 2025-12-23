@@ -36,7 +36,7 @@ export async function POST() {
       await connection.execute(`
         INSERT INTO app_identifier(app_name)
         VALUES
-          ('New MB'),
+          ('Bale'),
           ('CMS'),
           ('SMS Notif'),
           ('QRIS'),

@@ -54,7 +54,7 @@ export default function AppListCard() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-3 md:p-4 h-full flex flex-col transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl border border-white/20">
+    <div className="glass-card rounded-xl p-3 md:p-4 h-full flex flex-col transform transition-all duration-300 hover:scale-[1.01] hover:shadow-2xl border border-white/20 will-change-transform" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
       {/* Icon Header */}
       <div className="flex items-center gap-1.5 mb-1.5">
         <div className="w-8 h-8 rounded-md bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center shadow-md flex-shrink-0">

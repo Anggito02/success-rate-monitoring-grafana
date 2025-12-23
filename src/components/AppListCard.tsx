@@ -77,11 +77,13 @@ export default function AppListCard() {
             <p className="text-gray-500 text-xs">Loading...</p>
           </div>
         ) : error ? (
-          <div className="p-2 text-center bg-gradient-to-r from-red-50 to-rose-50 rounded-md m-1.5 border border-red-200">
-            <svg className="w-4 h-4 text-red-500 mx-auto mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-red-600 text-xs font-semibold">Error: {error}</p>
+          <div className="p-2 bg-gradient-to-r from-red-50 to-rose-50 rounded-md m-1.5 border border-red-200">
+            <div className="flex items-start gap-1.5">
+              <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-red-600 text-xs font-semibold break-words whitespace-normal flex-1">Error: {error}</p>
+            </div>
           </div>
         ) : applications.length === 0 ? (
           <div className="p-2 text-center">

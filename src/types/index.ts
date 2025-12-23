@@ -32,3 +32,15 @@ export interface SuccessRateEntry {
   id_app_identifier: number
 }
 
+export interface UnmappedRC {
+  id: number
+  id_app_identifier: number
+  app_name?: string
+  jenis_transaksi: string | null
+  rc: string | null
+  rc_description: string | null
+  status_transaksi: 'sukses' | 'failed' | 'pending' | null
+  error_type: 'S' | 'N' | 'Sukses' | null
+  created_at?: Date
+}
+

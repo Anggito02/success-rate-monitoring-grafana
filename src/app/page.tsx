@@ -5,6 +5,7 @@ import AppListCard from '@/components/AppListCard'
 import DictionaryUploadCard from '@/components/DictionaryUploadCard'
 import AddSuccessRateCard from '@/components/AddSuccessRateCard'
 import RestartDbCard from '@/components/RestartDbCard'
+import UnmappedRcCard from '@/components/UnmappedRcCard'
 
 export default function Home() {
   return (
@@ -24,35 +25,40 @@ export default function Home() {
         {/* Desktop Bento Layout - 2 rows compact */}
         <div className="hidden lg:grid lg:grid-cols-12 gap-2 lg:gap-3" style={{ gridTemplateRows: 'repeat(2, minmax(180px, auto))' }}>
           {/* App List Card - Left side (spans 2 rows) */}
-          <div className="lg:col-span-3 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.1s' }}>
+          <div className="lg:col-span-2 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.1s' }}>
             <AppListCard />
           </div>
 
-          {/* Add App Card - Top middle */}
-          <div className="lg:col-span-3 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.2s' }}>
+          {/* Unmapped RC Card - Second column (spans 2 rows) */}
+          <div className="lg:col-span-2 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.15s' }}>
+            <UnmappedRcCard />
+          </div>
+
+          {/* Add App Card - Top */}
+          <div className="lg:col-span-4 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.2s' }}>
             <AddAppCard />
           </div>
 
           {/* Dictionary Upload Card - Top right */}
-          <div className="lg:col-span-6 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.3s' }}>
+          <div className="lg:col-span-4 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.3s' }}>
             <DictionaryUploadCard />
           </div>
 
-          {/* Add Success Rate Card - Bottom middle */}
+          {/* Add Success Rate Card - Bottom */}
           <div className="lg:col-span-4 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.4s' }}>
             <AddSuccessRateCard />
           </div>
 
           {/* Restart DB Card - Bottom right */}
-          <div className="lg:col-span-5 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.5s' }}>
+          <div className="lg:col-span-4 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.5s' }}>
             <RestartDbCard />
           </div>
         </div>
 
-        {/* Tablet Layout - 2 rows */}
-        <div className="hidden md:grid lg:hidden md:grid-cols-6 gap-2 md:gap-3" style={{ gridTemplateRows: 'repeat(2, minmax(160px, auto))' }}>
-          {/* App List Card - Left side (spans 2 rows) */}
-          <div className="md:col-span-2 md:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.1s' }}>
+        {/* Tablet Layout - 3 rows */}
+        <div className="hidden md:grid lg:hidden md:grid-cols-6 gap-2 md:gap-3" style={{ gridTemplateRows: 'repeat(3, minmax(140px, auto))' }}>
+          {/* App List Card - Left side (spans 3 rows) */}
+          <div className="md:col-span-2 md:row-span-3 animate-fade-in bento-item" style={{ animationDelay: '0.1s' }}>
             <AppListCard />
           </div>
 
@@ -75,6 +81,11 @@ export default function Home() {
           <div className="md:col-span-2 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.5s' }}>
             <RestartDbCard />
           </div>
+
+          {/* Unmapped RC Card */}
+          <div className="md:col-span-4 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.6s' }}>
+            <UnmappedRcCard />
+          </div>
         </div>
 
         {/* Mobile Layout - Stack vertical */}
@@ -83,15 +94,18 @@ export default function Home() {
             <AppListCard />
           </div>
           <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <AddAppCard />
+            <UnmappedRcCard />
           </div>
           <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
-            <DictionaryUploadCard />
+            <AddAppCard />
           </div>
           <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
-            <AddSuccessRateCard />
+            <DictionaryUploadCard />
           </div>
           <div className="animate-fade-in" style={{ animationDelay: '0.5s' }}>
+            <AddSuccessRateCard />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
             <RestartDbCard />
           </div>
         </div>

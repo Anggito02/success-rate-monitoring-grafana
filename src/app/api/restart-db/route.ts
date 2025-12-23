@@ -80,11 +80,27 @@ export async function POST() {
         )
       `)
 
+      // Create unmapped_rc table for RCs that don't have mapping yet
+      await connection.execute(`
+        CREATE TABLE unmapped_rc (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          id_app_identifier INT NOT NULL,
+          jenis_transaksi VARCHAR(255),
+          rc VARCHAR(50),
+          rc_description VARCHAR(500),
+          status_transaksi ENUM('sukses', 'failed', 'pending'),
+          error_type ENUM('S', 'N', 'Sukses'),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (id_app_identifier) REFERENCES app_identifier(id) ON DELETE CASCADE,
+          UNIQUE KEY unique_unmapped_entry (id_app_identifier, jenis_transaksi, rc)
+        )
+      `)
+
       console.log('✅ Database schema restarted successfully!')
       
       return NextResponse.json({
         success: true,
-        message: 'Database schema restarted successfully. Tables created: app_identifier, app_success_rate, response_code_dictionary',
+        message: 'Database schema restarted successfully. Tables created: app_identifier, app_success_rate, response_code_dictionary, unmapped_rc',
       } as ApiResponse)
     } finally {
       connection.release()

@@ -299,7 +299,11 @@ export async function POST(request: NextRequest) {
       const applicationName = appResult[0].app_name
 
       // Lookup error_type from response_code_dictionary for each entry
+      // and apply new business logic rules
       for (const entry of successRateData) {
+        let foundInDictionary = false
+
+        // First, try to find error_type from dictionary
         if (entry.rc) {
           // Try to find error_type by exact match on jenis_transaksi and rc
           if (entry.jenis_transaksi) {
@@ -310,18 +314,57 @@ export async function POST(request: NextRequest) {
 
             if (dictionaryResult.length > 0) {
               entry.error_type = dictionaryResult[0].error_type
-              continue
+              foundInDictionary = true
             }
           }
 
           // If no exact match, try lookup by rc only for this application
-          const [rcOnlyResult]: any = await connection.execute(
-            'SELECT error_type FROM response_code_dictionary WHERE id_app_identifier = ? AND rc = ? LIMIT 1',
-            [applicationId, entry.rc]
-          )
+          if (!foundInDictionary) {
+            const [rcOnlyResult]: any = await connection.execute(
+              'SELECT error_type FROM response_code_dictionary WHERE id_app_identifier = ? AND rc = ? LIMIT 1',
+              [applicationId, entry.rc]
+            )
 
-          if (rcOnlyResult.length > 0) {
-            entry.error_type = rcOnlyResult[0].error_type
+            if (rcOnlyResult.length > 0) {
+              entry.error_type = rcOnlyResult[0].error_type
+              foundInDictionary = true
+            }
+          }
+        }
+
+        // Apply new business logic if error_type is still null
+        if (entry.error_type === null) {
+          if (entry.status_transaksi === 'sukses') {
+            // Rule 1: If status is sukses and error_type is null → Sukses
+            entry.error_type = 'Sukses'
+          } else if (entry.status_transaksi === 'failed') {
+            // Rule 2: If status is failed and error_type is null
+            if (!entry.rc || entry.rc === '' || entry.rc === null) {
+              // If RC is null/empty → S
+              entry.error_type = 'S'
+            } else {
+              // If RC exists
+              if (entry.rc === '0' || entry.rc === '00') {
+                // If RC is 0 or 00 → Sukses
+                entry.error_type = 'Sukses'
+              } else {
+                // RC exists but not mapped → Insert into unmapped_rc
+                // Use INSERT IGNORE to avoid duplicates
+                await connection.execute(
+                  `INSERT IGNORE INTO unmapped_rc 
+                   (id_app_identifier, jenis_transaksi, rc, rc_description, status_transaksi, error_type)
+                   VALUES (?, ?, ?, ?, ?, NULL)`,
+                  [
+                    applicationId,
+                    entry.jenis_transaksi,
+                    entry.rc,
+                    entry.rc_description,
+                    entry.status_transaksi
+                  ]
+                )
+                // error_type remains null
+              }
+            }
           }
         }
       }

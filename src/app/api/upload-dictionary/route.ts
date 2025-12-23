@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import xlsx from 'xlsx'
 import type { ApiResponse } from '@/types'
+import * as XLSX from 'xlsx'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
 
     // Parse Excel file
-    const workbook = xlsx.read(buffer, { type: 'buffer' })
+    const workbook = XLSX.read(buffer, { type: 'buffer' })
 
     if (workbook.SheetNames.length === 0) {
       return NextResponse.json(
@@ -54,11 +54,11 @@ export async function POST(request: NextRequest) {
     const worksheet = workbook.Sheets[firstSheetName]
 
     // Get headers from first row
-    const range = xlsx.utils.decode_range(worksheet['!ref'] || 'A1')
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
     const headers: string[] = []
 
     for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellAddress = xlsx.utils.encode_cell({ r: 0, c: col })
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
       const cell = worksheet[cellAddress]
       if (cell && cell.v) {
         headers.push(String(cell.v).trim())
@@ -108,9 +108,9 @@ export async function POST(request: NextRequest) {
 
     for (let rowNum = 1; rowNum <= range.e.r; rowNum++) {
       const jenisTransaksiCell =
-        worksheet[xlsx.utils.encode_cell({ r: rowNum, c: jenisTransaksiIndex })]
-      const rcCell = worksheet[xlsx.utils.encode_cell({ r: rowNum, c: rcIndex })]
-      const snCell = worksheet[xlsx.utils.encode_cell({ r: rowNum, c: snIndex })]
+        worksheet[XLSX.utils.encode_cell({ r: rowNum, c: jenisTransaksiIndex })]
+      const rcCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcIndex })]
+      const snCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: snIndex })]
 
       const jenisTransaksi =
         jenisTransaksiCell && jenisTransaksiCell.v

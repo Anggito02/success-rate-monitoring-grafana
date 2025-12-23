@@ -1,0 +1,131 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import type { Application } from '@/types'
+
+export default function AppListCard() {
+  const [applications, setApplications] = useState<Application[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadApplications = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const response = await fetch('/api/applications')
+      const result = await response.json()
+
+      if (result.success) {
+        setApplications(result.data)
+      } else {
+        throw new Error(result.message || 'Failed to load applications')
+      }
+    } catch (err: any) {
+      setError(err.message)
+      console.error('Error loading applications:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadApplications()
+
+    // Listen for app added event
+    const handleAppAdded = () => {
+      loadApplications()
+    }
+
+    window.addEventListener('appAdded', handleAppAdded)
+
+    return () => {
+      window.removeEventListener('appAdded', handleAppAdded)
+    }
+  }, [])
+
+  const getInitials = (name: string) => {
+    if (!name) return '?'
+    return name
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase())
+      .slice(0, 2)
+      .join('')
+  }
+
+  return (
+    <div className="glass-card rounded-xl p-3 md:p-4 h-full flex flex-col transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl border border-white/20">
+      {/* Icon Header */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <div className="w-8 h-8 rounded-md bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center shadow-md flex-shrink-0">
+          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-sm md:text-base font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+            Application List
+          </h2>
+          <p className="text-xs text-gray-500">Registered apps</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto mb-1.5 border border-gray-200/50 rounded-md bg-white/60 backdrop-blur-sm shadow-inner min-h-0">
+        {isLoading ? (
+          <div className="p-2 text-center">
+            <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mb-1"></div>
+            <p className="text-gray-500 text-xs">Loading...</p>
+          </div>
+        ) : error ? (
+          <div className="p-2 text-center bg-gradient-to-r from-red-50 to-rose-50 rounded-md m-1.5 border border-red-200">
+            <svg className="w-4 h-4 text-red-500 mx-auto mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-red-600 text-xs font-semibold">Error: {error}</p>
+          </div>
+        ) : applications.length === 0 ? (
+          <div className="p-2 text-center">
+            <svg className="w-5 h-5 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+            <p className="text-gray-500 text-xs">No apps found</p>
+          </div>
+        ) : (
+          <>
+            <div className="sticky top-0 bg-gradient-to-r from-blue-700 to-blue-900 text-white text-xs font-bold text-center py-1 px-1.5 rounded-t-md backdrop-blur-sm z-10">
+              Total: {applications.length}
+            </div>
+            <ul className="list-none p-0 m-0">
+              {applications.map((app, index) => (
+                <li
+                  key={app.id}
+                  className="py-1 px-1.5 border-b border-gray-200/50 last:border-b-0 flex items-center gap-1.5 transition-all duration-200 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 group"
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white font-bold text-xs shadow-sm group-hover:scale-110 transition-transform duration-200 flex-shrink-0">
+                    {getInitials(app.app_name)}
+                  </div>
+                  <span className="font-medium text-xs text-gray-800 group-hover:text-gray-900 flex-1 truncate">
+                    {app.app_name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={loadApplications}
+        className="w-full px-2.5 py-1.5 rounded-md font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-blue-600 to-blue-800 text-white hover:from-blue-700 hover:to-blue-900 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-1"
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Refresh
+      </button>
+    </div>
+  )
+}
+

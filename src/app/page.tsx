@@ -6,6 +6,7 @@ import DictionaryUploadCard from '@/components/DictionaryUploadCard'
 import AddSuccessRateCard from '@/components/AddSuccessRateCard'
 import RestartDbCard from '@/components/RestartDbCard'
 import UnmappedRcCard from '@/components/UnmappedRcCard'
+import DictionaryCard from '@/components/DictionaryCard'
 
 export default function Home() {
   return (
@@ -22,8 +23,8 @@ export default function Home() {
 
       {/* Bento Box Grid Layout */}
       <div className="max-w-7xl mx-auto">
-        {/* Desktop Bento Layout - 2 rows compact */}
-        <div className="hidden lg:grid lg:grid-cols-12 gap-2 lg:gap-3" style={{ gridTemplateRows: 'repeat(2, minmax(180px, auto))' }}>
+        {/* Desktop Bento Layout - 3 rows */}
+        <div className="hidden lg:grid lg:grid-cols-12 gap-2 lg:gap-3" style={{ gridTemplateRows: 'repeat(3, minmax(180px, auto))' }}>
           {/* App List Card - Left side (spans 2 rows) */}
           <div className="lg:col-span-2 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.1s' }}>
             <AppListCard />
@@ -53,10 +54,15 @@ export default function Home() {
           <div className="lg:col-span-4 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.5s' }}>
             <RestartDbCard />
           </div>
+
+          {/* Dictionary Card - Full width at bottom */}
+          <div className="lg:col-span-12 lg:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.6s' }}>
+            <DictionaryCard />
+          </div>
         </div>
 
-        {/* Tablet Layout - 3 rows */}
-        <div className="hidden md:grid lg:hidden md:grid-cols-6 gap-2 md:gap-3" style={{ gridTemplateRows: 'repeat(3, minmax(140px, auto))' }}>
+        {/* Tablet Layout - 4 rows */}
+        <div className="hidden md:grid lg:hidden md:grid-cols-6 gap-2 md:gap-3" style={{ gridTemplateRows: 'repeat(4, minmax(140px, auto))' }}>
           {/* App List Card - Left side (spans 3 rows) */}
           <div className="md:col-span-2 md:row-span-3 animate-fade-in bento-item" style={{ animationDelay: '0.1s' }}>
             <AppListCard />
@@ -86,6 +92,11 @@ export default function Home() {
           <div className="md:col-span-4 md:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.6s' }}>
             <UnmappedRcCard />
           </div>
+
+          {/* Dictionary Card - Full width at bottom */}
+          <div className="md:col-span-6 md:row-span-1 animate-fade-in bento-item" style={{ animationDelay: '0.7s' }}>
+            <DictionaryCard />
+          </div>
         </div>
 
         {/* Mobile Layout - Stack vertical */}
@@ -107,6 +118,9 @@ export default function Home() {
           </div>
           <div className="animate-fade-in" style={{ animationDelay: '0.6s' }}>
             <RestartDbCard />
+          </div>
+          <div className="animate-fade-in" style={{ animationDelay: '0.7s' }}>
+            <DictionaryCard />
           </div>
         </div>
       </div>

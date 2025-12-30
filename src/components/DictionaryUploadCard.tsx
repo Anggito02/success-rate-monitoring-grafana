@@ -183,6 +183,8 @@ export default function DictionaryUploadCard() {
 
       if (result.success) {
         setMessage({ text: result.message, type: 'success' })
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('dictionaryUploaded'))
         // Don't auto-reset, let user manually start new upload
       } else {
         throw new Error(result.message || 'Upload failed')

@@ -6,9 +6,11 @@ import type { UnmappedRC } from '@/types'
 export default function UnmappedRcCard() {
   const [unmappedRcs, setUnmappedRcs] = useState<UnmappedRC[]>([])
   const [selectedErrorTypes, setSelectedErrorTypes] = useState<Record<number, 'S' | 'N' | 'Sukses'>>({})
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<number | null>(null)
+  const [submittingAll, setSubmittingAll] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   const loadUnmappedRcs = async () => {
@@ -21,6 +23,9 @@ export default function UnmappedRcCard() {
 
       if (result.success) {
         setUnmappedRcs(result.data)
+        // Reset selections when data reloads
+        setSelectedItems(new Set())
+        setSelectedErrorTypes({})
       } else {
         throw new Error(result.message || 'Failed to load unmapped RCs')
       }
@@ -54,6 +59,91 @@ export default function UnmappedRcCard() {
       ...prev,
       [id]: value
     }))
+    // Auto-select item when error type is chosen
+    setSelectedItems(prev => new Set(prev).add(id))
+  }
+
+  const handleSelectItem = (id: number) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedItems.size === unmappedRcs.length) {
+      // Deselect all
+      setSelectedItems(new Set())
+    } else {
+      // Select all
+      setSelectedItems(new Set(unmappedRcs.map(rc => rc.id)))
+    }
+  }
+
+  const handleSubmitAll = async () => {
+    const itemsToSubmit = unmappedRcs.filter(rc => 
+      selectedItems.has(rc.id) && selectedErrorTypes[rc.id]
+    )
+
+    if (itemsToSubmit.length === 0) {
+      setMessage({ text: 'Please select at least one RC with an error type', type: 'error' })
+      return
+    }
+
+    try {
+      setSubmittingAll(true)
+      setMessage(null)
+
+      const mappings = itemsToSubmit.map(rc => ({
+        id: rc.id,
+        id_app_identifier: rc.id_app_identifier,
+        jenis_transaksi: rc.jenis_transaksi,
+        rc: rc.rc,
+        error_type: selectedErrorTypes[rc.id],
+      }))
+
+      const response = await fetch('/api/unmapped-rc/submit-batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mappings }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setMessage({ 
+          text: result.message || `Successfully mapped ${result.data?.success || itemsToSubmit.length} RC(s)`, 
+          type: 'success' 
+        })
+        // Remove submitted items from local state
+        const submittedIds = new Set(itemsToSubmit.map(rc => rc.id))
+        setUnmappedRcs(prev => prev.filter(item => !submittedIds.has(item.id)))
+        // Clear selections
+        setSelectedItems(new Set())
+        setSelectedErrorTypes(prev => {
+          const newState = { ...prev }
+          itemsToSubmit.forEach(rc => {
+            delete newState[rc.id]
+          })
+          return newState
+        })
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('unmappedRcSubmitted'))
+      } else {
+        throw new Error(result.message || 'Failed to submit mappings')
+      }
+    } catch (err: any) {
+      setMessage({ text: err.message, type: 'error' })
+    } finally {
+      setSubmittingAll(false)
+    }
   }
 
   const handleSubmit = async (rc: UnmappedRC) => {
@@ -88,12 +178,19 @@ export default function UnmappedRcCard() {
         setMessage({ text: result.message, type: 'success' })
         // Remove from local state
         setUnmappedRcs(prev => prev.filter(item => item.id !== rc.id))
-        // Remove from selected error types
+        // Remove from selected error types and selected items
         setSelectedErrorTypes(prev => {
           const newState = { ...prev }
           delete newState[rc.id]
           return newState
         })
+        setSelectedItems(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(rc.id)
+          return newSet
+        })
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('unmappedRcSubmitted'))
       } else {
         throw new Error(result.message || 'Failed to submit mapping')
       }
@@ -166,65 +263,140 @@ export default function UnmappedRcCard() {
           </div>
         ) : (
           <>
-            <div className="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-800 text-white text-xs font-bold text-center py-1 px-1.5 rounded-t-md backdrop-blur-sm z-10">
-              Total: {unmappedRcs.length} RC belum dimapping
+            <div className="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-800 text-white text-xs font-bold py-1 px-1.5 rounded-t-md backdrop-blur-sm z-10">
+              <div className="flex items-center justify-between">
+                <span>Total: {unmappedRcs.length} RC belum dimapping</span>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.size === unmappedRcs.length && unmappedRcs.length > 0}
+                      onChange={handleSelectAll}
+                      className="w-3 h-3 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span>Select All</span>
+                  </label>
+                  {selectedItems.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSubmitAll}
+                      disabled={submittingAll || unmappedRcs.filter(rc => selectedItems.has(rc.id) && selectedErrorTypes[rc.id]).length === 0}
+                      className="px-2 py-0.5 rounded text-xs font-semibold transition-all duration-300 bg-white text-orange-700 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      {submittingAll ? (
+                        <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Submit All ({unmappedRcs.filter(rc => selectedItems.has(rc.id) && selectedErrorTypes[rc.id]).length})
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             <ul className="list-none p-0 m-0">
               {unmappedRcs.map((rc) => (
                 <li
                   key={rc.id}
-                  className="py-2 px-2 border-b border-gray-200/50 last:border-b-0 transition-all duration-200 hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100"
+                  className={`py-2 px-2 border-b border-gray-200/50 last:border-b-0 transition-all duration-200 ${
+                    selectedItems.has(rc.id) 
+                      ? 'bg-gradient-to-r from-orange-100 to-orange-50' 
+                      : 'hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100'
+                  }`}
                 >
                   <div className="flex flex-col gap-1.5">
-                    {/* RC Info */}
+                    {/* RC Info with Checkbox */}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded">
-                            {rc.app_name}
-                          </span>
-                          <span className="text-xs font-mono font-bold text-gray-800">
-                            RC: {rc.rc}
-                          </span>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(rc.id)}
+                          onChange={() => handleSelectItem(rc.id)}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded">
+                              {rc.app_name}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-gray-800">
+                              RC: {rc.rc}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 truncate mt-0.5">
+                            {rc.jenis_transaksi || 'N/A'} • {rc.rc_description || 'No description'}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-600 truncate mt-0.5">
-                          {rc.jenis_transaksi || 'N/A'} • {rc.rc_description || 'No description'}
-                        </p>
                       </div>
                     </div>
 
-                    {/* Radio Buttons & Submit */}
+                    {/* Enhanced Radio Buttons & Submit */}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        {(['S', 'N', 'Sukses'] as const).map((value) => (
-                          <label
-                            key={value}
-                            className="flex items-center gap-1 cursor-pointer"
-                          >
-                            <input
-                              type="radio"
-                              name={`error_type_${rc.id}`}
-                              value={value}
-                              checked={selectedErrorTypes[rc.id] === value}
-                              onChange={() => handleErrorTypeChange(rc.id, value)}
-                              className="w-3 h-3 text-orange-600 border-gray-300 focus:ring-orange-500"
-                            />
-                            <span className={`text-xs font-medium ${
-                              value === 'S' ? 'text-blue-600' :
-                              value === 'N' ? 'text-red-600' :
-                              'text-green-600'
-                            }`}>
-                              {value}
-                            </span>
-                          </label>
-                        ))}
+                      <div className="flex items-center gap-2 flex-1">
+                        {(['S', 'N', 'Sukses'] as const).map((value) => {
+                          const isSelected = selectedErrorTypes[rc.id] === value
+                          const colorClasses = {
+                            'S': {
+                              bg: isSelected ? 'bg-blue-500' : 'bg-blue-50',
+                              text: isSelected ? 'text-white' : 'text-blue-700',
+                              border: isSelected ? 'border-blue-600' : 'border-blue-300',
+                              hover: 'hover:bg-blue-100 hover:border-blue-400'
+                            },
+                            'N': {
+                              bg: isSelected ? 'bg-red-500' : 'bg-red-50',
+                              text: isSelected ? 'text-white' : 'text-red-700',
+                              border: isSelected ? 'border-red-600' : 'border-red-300',
+                              hover: 'hover:bg-red-100 hover:border-red-400'
+                            },
+                            'Sukses': {
+                              bg: isSelected ? 'bg-green-500' : 'bg-green-50',
+                              text: isSelected ? 'text-white' : 'text-green-700',
+                              border: isSelected ? 'border-green-600' : 'border-green-300',
+                              hover: 'hover:bg-green-100 hover:border-green-400'
+                            }
+                          }
+                          const colors = colorClasses[value]
+                          
+                          return (
+                            <label
+                              key={value}
+                              className={`flex items-center justify-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border-2 transition-all duration-200 font-semibold text-xs min-w-[60px] ${
+                                colors.bg
+                              } ${colors.text} ${colors.border} ${colors.hover} ${
+                                isSelected ? 'shadow-md scale-105' : 'shadow-sm'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`error_type_${rc.id}`}
+                                value={value}
+                                checked={isSelected}
+                                onChange={() => handleErrorTypeChange(rc.id, value)}
+                                className="sr-only"
+                              />
+                              <span className="font-bold">{value}</span>
+                              {isSelected && (
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </label>
+                          )
+                        })}
                       </div>
                       
                       <button
                         type="button"
                         onClick={() => handleSubmit(rc)}
-                        disabled={!selectedErrorTypes[rc.id] || submitting === rc.id}
-                        className="px-2 py-1 rounded text-xs font-semibold transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-700 text-white hover:from-orange-600 hover:to-orange-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        disabled={!selectedErrorTypes[rc.id] || submitting === rc.id || submittingAll}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-700 text-white hover:from-orange-600 hover:to-orange-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 shadow-sm hover:shadow-md"
                       >
                         {submitting === rc.id ? (
                           <>

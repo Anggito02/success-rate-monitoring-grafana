@@ -44,15 +44,30 @@ export async function POST(request: NextRequest) {
       )
 
       // 2. Update all app_success_rate entries that match this RC
-      await connection.execute(
-        `UPDATE app_success_rate 
+      // Build query based on whether jenis_transaksi is provided
+      let updateQuery: string
+      let updateParams: any[]
+      
+      if (jenis_transaksi && jenis_transaksi !== '') {
+        // If jenis_transaksi is provided, match it specifically
+        updateQuery = `UPDATE app_success_rate 
          SET error_type = ?
          WHERE id_app_identifier = ? 
          AND rc = ? 
-         AND (jenis_transaksi = ? OR ? IS NULL OR ? = '')
-         AND error_type IS NULL`,
-        [error_type, id_app_identifier, rc, jenis_transaksi, jenis_transaksi, jenis_transaksi]
-      )
+         AND jenis_transaksi = ?
+         AND error_type IS NULL`
+        updateParams = [error_type, id_app_identifier, rc, jenis_transaksi]
+      } else {
+        // If jenis_transaksi is not provided, update all RCs regardless of jenis_transaksi
+        updateQuery = `UPDATE app_success_rate 
+         SET error_type = ?
+         WHERE id_app_identifier = ? 
+         AND rc = ?
+         AND error_type IS NULL`
+        updateParams = [error_type, id_app_identifier, rc]
+      }
+      
+      await connection.execute(updateQuery, updateParams)
 
       // 3. Delete from unmapped_rc
       await connection.execute(
@@ -85,4 +100,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

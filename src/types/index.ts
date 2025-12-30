@@ -44,3 +44,13 @@ export interface UnmappedRC {
   created_at?: Date
 }
 
+export interface DictionaryViewEntry {
+  id: number
+  id_app_identifier: number
+  app_name: string
+  jenis_transaksi: string | null
+  rc: string
+  rc_description: string | null
+  error_type: 'S' | 'N' | 'Sukses'
+}
+

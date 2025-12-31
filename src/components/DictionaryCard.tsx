@@ -18,6 +18,9 @@ export default function DictionaryCard() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingErrorType, setEditingErrorType] = useState<'S' | 'N' | 'Sukses' | ''>('')
+  const [updatingId, setUpdatingId] = useState<number | null>(null)
   const limit = 25
 
   const loadApplications = async () => {
@@ -124,6 +127,60 @@ export default function DictionaryCard() {
         return 'bg-red-100 text-red-800 border-red-300'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300'
+    }
+  }
+
+  const handleEditErrorType = (entry: DictionaryViewEntry) => {
+    setEditingId(entry.id)
+    setEditingErrorType(entry.error_type as 'S' | 'N' | 'Sukses' || '')
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditingErrorType('')
+  }
+
+  const handleUpdateErrorType = async (id: number, newErrorType: 'S' | 'N' | 'Sukses') => {
+    if (!newErrorType || !['S', 'N', 'Sukses'].includes(newErrorType)) {
+      setError('Invalid error type')
+      return
+    }
+
+    try {
+      setUpdatingId(id)
+      setError(null)
+
+      const response = await fetch('/api/dictionary/update', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          error_type: newErrorType,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update local state
+        setDictionaryEntries(prev =>
+          prev.map(entry =>
+            entry.id === id ? { ...entry, error_type: newErrorType } : entry
+          )
+        )
+        setEditingId(null)
+        setEditingErrorType('')
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('dictionaryUpdated'))
+      } else {
+        throw new Error(result.message || 'Failed to update error type')
+      }
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setUpdatingId(null)
     }
   }
 
@@ -347,6 +404,7 @@ export default function DictionaryCard() {
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b-2 border-gray-300">Description</th>
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b-2 border-gray-300">Type</th>
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b-2 border-gray-300">Jenis</th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b-2 border-gray-300">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,11 +420,112 @@ export default function DictionaryCard() {
                         {entry.rc_description || '-'}
                       </td>
                       <td className="px-2 py-1.5">
-                        <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold border ${getErrorTypeColor(entry.error_type)}`}>
-                          {entry.error_type}
-                        </span>
+                        {editingId === entry.id ? (
+                          <div className="flex items-center gap-1">
+                            {(['S', 'N', 'Sukses'] as const).map((value) => {
+                              const isSelected = editingErrorType === value
+                              const colorClasses = {
+                                'S': {
+                                  bg: isSelected ? 'bg-blue-500' : 'bg-blue-50',
+                                  text: isSelected ? 'text-white' : 'text-blue-700',
+                                  border: isSelected ? 'border-blue-600' : 'border-blue-300',
+                                  hover: 'hover:bg-blue-100 hover:border-blue-400'
+                                },
+                                'N': {
+                                  bg: isSelected ? 'bg-red-500' : 'bg-red-50',
+                                  text: isSelected ? 'text-white' : 'text-red-700',
+                                  border: isSelected ? 'border-red-600' : 'border-red-300',
+                                  hover: 'hover:bg-red-100 hover:border-red-400'
+                                },
+                                'Sukses': {
+                                  bg: isSelected ? 'bg-green-500' : 'bg-green-50',
+                                  text: isSelected ? 'text-white' : 'text-green-700',
+                                  border: isSelected ? 'border-green-600' : 'border-green-300',
+                                  hover: 'hover:bg-green-100 hover:border-green-400'
+                                }
+                              }
+                              const colors = colorClasses[value]
+                              
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => setEditingErrorType(value)}
+                                  disabled={updatingId === entry.id}
+                                  className={`px-2 py-0.5 rounded border-2 transition-all duration-200 font-semibold text-xs min-w-[45px] ${
+                                    colors.bg
+                                  } ${colors.text} ${colors.border} ${colors.hover} ${
+                                    isSelected ? 'shadow-md scale-105' : 'shadow-sm'
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                  {value}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold border ${getErrorTypeColor(entry.error_type)}`}>
+                            {entry.error_type}
+                          </span>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-gray-600 text-[10px]">{entry.jenis_transaksi || '-'}</td>
+                      <td className="px-2 py-1.5">
+                        {editingId === entry.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editingErrorType && ['S', 'N', 'Sukses'].includes(editingErrorType)) {
+                                  handleUpdateErrorType(entry.id, editingErrorType as 'S' | 'N' | 'Sukses')
+                                }
+                              }}
+                              disabled={updatingId === entry.id || !editingErrorType || !['S', 'N', 'Sukses'].includes(editingErrorType)}
+                              className="px-2 py-1 rounded text-xs font-semibold transition-all duration-200 bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              title="Save"
+                            >
+                              {updatingId === entry.id ? (
+                                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                <>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Save
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              disabled={updatingId === entry.id}
+                              className="px-2 py-1 rounded text-xs font-semibold transition-all duration-200 bg-gray-500 text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              title="Cancel"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleEditErrorType(entry)}
+                            disabled={updatingId === entry.id}
+                            className="px-2 py-1 rounded text-xs font-semibold transition-all duration-200 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            title="Edit error type"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

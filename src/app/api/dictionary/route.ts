@@ -79,11 +79,9 @@ export async function GET(request: NextRequest) {
           d.rc LIKE ? 
           OR d.jenis_transaksi LIKE ? 
           OR a.app_name LIKE ?
-          OR EXISTS (
-            SELECT 1 FROM app_success_rate asr 
-            WHERE asr.id_app_identifier = d.id_app_identifier 
-              AND asr.rc = d.rc 
-              AND asr.rc_description LIKE ?
+          OR (
+            asr_desc.rc_description IS NOT NULL 
+            AND asr_desc.rc_description LIKE ?
           )
         )`
         const searchPattern = `%${search}%`
@@ -132,6 +130,8 @@ export async function GET(request: NextRequest) {
             SELECT 1 FROM app_success_rate asr 
             WHERE asr.id_app_identifier = d.id_app_identifier 
               AND asr.rc = d.rc 
+              AND COALESCE(asr.jenis_transaksi, '') = COALESCE(d.jenis_transaksi, '')
+              AND asr.rc_description IS NOT NULL
               AND asr.rc_description LIKE ?
           )
         )`

@@ -24,7 +24,7 @@ export default function Home() {
       {/* Bento Box Grid Layout */}
       <div className="max-w-7xl mx-auto">
         {/* Desktop Bento Layout - 3 rows */}
-        <div className="hidden lg:grid lg:grid-cols-12 gap-2 lg:gap-3" style={{ gridTemplateRows: 'repeat(3, minmax(180px, auto))' }}>
+        <div className="hidden lg:grid lg:grid-cols-12 gap-2 lg:gap-3" style={{ gridTemplateRows: 'repeat(3, minmax(140px, auto))' }}>
           {/* App List Card - Left side (spans 2 rows) */}
           <div className="lg:col-span-2 lg:row-span-2 animate-fade-in bento-item" style={{ animationDelay: '0.1s' }}>
             <AppListCard />

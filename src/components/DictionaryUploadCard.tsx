@@ -34,37 +34,99 @@ export default function DictionaryUploadCard() {
     }
   }
 
-  const isValidExcelFile = (file: File) => {
-    const validExtensions = ['.xlsx', '.xls']
+  const isValidFile = (file: File) => {
+    const validExtensions = ['.xlsx', '.xls', '.csv']
     const fileName = file.name.toLowerCase()
     return validExtensions.some((ext) => fileName.endsWith(ext))
   }
 
-  const validateExcelColumns = async (file: File): Promise<boolean> => {
+  const isCSVFile = (file: File) => {
+    return file.name.toLowerCase().endsWith('.csv')
+  }
+
+  const parseCSV = (text: string): string[][] => {
+    const lines: string[] = []
+    let currentLine = ''
+    let inQuotes = false
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i]
+      const nextChar = text[i + 1]
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentLine += '"'
+          i++ // Skip next quote
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === '\n' || char === '\r') {
+        if (!inQuotes) {
+          if (currentLine.trim()) {
+            lines.push(currentLine)
+            currentLine = ''
+          }
+          // Skip \r\n combination
+          if (char === '\r' && nextChar === '\n') {
+            i++
+          }
+        } else {
+          currentLine += char
+        }
+      } else {
+        currentLine += char
+      }
+    }
+
+    if (currentLine.trim()) {
+      lines.push(currentLine)
+    }
+
+    return lines.map(line => {
+      const fields: string[] = []
+      let currentField = ''
+      let inFieldQuotes = false
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        const nextChar = line[i + 1]
+
+        if (char === '"') {
+          if (inFieldQuotes && nextChar === '"') {
+            currentField += '"'
+            i++
+          } else {
+            inFieldQuotes = !inFieldQuotes
+          }
+        } else if (char === ',' && !inFieldQuotes) {
+          fields.push(currentField.trim())
+          currentField = ''
+        } else {
+          currentField += char
+        }
+      }
+      fields.push(currentField.trim())
+      return fields
+    })
+  }
+
+  const validateFileColumns = async (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
       const reader = new FileReader()
 
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer)
-
-          // Dynamic import for XLSX in browser
-          if (typeof window !== 'undefined' && (window as any).XLSX) {
-            const XLSX = (window as any).XLSX
-            const workbook = XLSX.read(data, { type: 'array' })
-            const firstSheetName = workbook.SheetNames[0]
-            const worksheet = workbook.Sheets[firstSheetName]
-
-            const range = XLSX.utils.decode_range(worksheet['!ref'])
-            const headers: string[] = []
-
-            for (let col = range.s.c; col <= range.e.c; col++) {
-              const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
-              const cell = worksheet[cellAddress]
-              if (cell && cell.v) {
-                headers.push(String(cell.v).trim())
-              }
+          if (isCSVFile(file)) {
+            // Parse CSV
+            const text = e.target?.result as string
+            const rows = parseCSV(text)
+            
+            if (rows.length === 0) {
+              resolve(false)
+              return
             }
+
+            const headers = rows[0].map(h => h.trim())
 
             // Check if there are exactly 3 columns
             if (headers.length !== 3) {
@@ -84,24 +146,69 @@ export default function DictionaryUploadCard() {
 
             resolve(hasAllColumns)
           } else {
-            // If XLSX not loaded, skip validation
-            resolve(true)
+            // Parse Excel
+            const data = new Uint8Array(e.target?.result as ArrayBuffer)
+
+            // Dynamic import for XLSX in browser
+            if (typeof window !== 'undefined' && (window as any).XLSX) {
+              const XLSX = (window as any).XLSX
+              const workbook = XLSX.read(data, { type: 'array' })
+              const firstSheetName = workbook.SheetNames[0]
+              const worksheet = workbook.Sheets[firstSheetName]
+
+              const range = XLSX.utils.decode_range(worksheet['!ref'])
+              const headers: string[] = []
+
+              for (let col = range.s.c; col <= range.e.c; col++) {
+                const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
+                const cell = worksheet[cellAddress]
+                if (cell && cell.v) {
+                  headers.push(String(cell.v).trim())
+                }
+              }
+
+              // Check if there are exactly 3 columns
+              if (headers.length !== 3) {
+                resolve(false)
+                return
+              }
+
+              // Check if all required columns exist (case-insensitive)
+              const normalizedHeaders = headers.map((h) => h.toLowerCase())
+              const normalizedRequired = requiredColumns.map((r) =>
+                r.toLowerCase()
+              )
+
+              const hasAllColumns = normalizedRequired.every((required) =>
+                normalizedHeaders.includes(required)
+              )
+
+              resolve(hasAllColumns)
+            } else {
+              // If XLSX not loaded, skip validation
+              resolve(true)
+            }
           }
         } catch (error) {
-          console.error('Error validating Excel:', error)
+          console.error('Error validating file:', error)
           resolve(false)
         }
       }
 
       reader.onerror = () => resolve(false)
-      reader.readAsArrayBuffer(file)
+      
+      if (isCSVFile(file)) {
+        reader.readAsText(file)
+      } else {
+        reader.readAsArrayBuffer(file)
+      }
     })
   }
 
   const handleFileSelect = async (file: File) => {
-    if (!isValidExcelFile(file)) {
+    if (!isValidFile(file)) {
       setMessage({
-        text: 'Please upload only Excel files (.xlsx or .xls)',
+        text: 'Please upload only Excel files (.xlsx or .xls) or CSV files (.csv)',
         type: 'error',
       })
       return
@@ -109,7 +216,7 @@ export default function DictionaryUploadCard() {
 
     setMessage({ text: 'Validating file columns...', type: 'info' })
 
-    const isValid = await validateExcelColumns(file)
+    const isValid = await validateFileColumns(file)
 
     if (isValid) {
       setSelectedFile(file)
@@ -263,13 +370,13 @@ export default function DictionaryUploadCard() {
             <p className="text-xs font-medium text-gray-700">
               Drag & drop or click
             </p>
-            <p className="text-xs text-gray-400">Excel file</p>
+            <p className="text-xs text-gray-400">Excel or CSV file</p>
           </div>
         )}
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.csv"
           onChange={handleFileInputChange}
           className="hidden"
         />

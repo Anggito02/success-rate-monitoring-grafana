@@ -43,13 +43,83 @@ export default function AddSuccessRateCard() {
     }
   }
 
-  const isValidExcelFile = (file: File) => {
-    const validExtensions = ['.xlsx', '.xls']
+  const isValidFile = (file: File) => {
+    const validExtensions = ['.xlsx', '.xls', '.csv']
     const fileName = file.name.toLowerCase()
     return validExtensions.some((ext) => fileName.endsWith(ext))
   }
 
-  const validateExcelColumns = async (
+  const isCSVFile = (file: File) => {
+    return file.name.toLowerCase().endsWith('.csv')
+  }
+
+  const parseCSV = (text: string): string[][] => {
+    const lines: string[] = []
+    let currentLine = ''
+    let inQuotes = false
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i]
+      const nextChar = text[i + 1]
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentLine += '"'
+          i++ // Skip next quote
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === '\n' || char === '\r') {
+        if (!inQuotes) {
+          if (currentLine.trim()) {
+            lines.push(currentLine)
+            currentLine = ''
+          }
+          // Skip \r\n combination
+          if (char === '\r' && nextChar === '\n') {
+            i++
+          }
+        } else {
+          currentLine += char
+        }
+      } else {
+        currentLine += char
+      }
+    }
+
+    if (currentLine.trim()) {
+      lines.push(currentLine)
+    }
+
+    return lines.map(line => {
+      const fields: string[] = []
+      let currentField = ''
+      let inFieldQuotes = false
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        const nextChar = line[i + 1]
+
+        if (char === '"') {
+          if (inFieldQuotes && nextChar === '"') {
+            currentField += '"'
+            i++
+          } else {
+            inFieldQuotes = !inFieldQuotes
+          }
+        } else if (char === ',' && !inFieldQuotes) {
+          fields.push(currentField.trim())
+          currentField = ''
+        } else {
+          currentField += char
+        }
+      }
+      fields.push(currentField.trim())
+      return fields
+    })
+  }
+
+  const validateFileColumns = async (
     file: File
   ): Promise<{ isValid: boolean; error?: string }> => {
     return new Promise((resolve) => {
@@ -57,24 +127,17 @@ export default function AddSuccessRateCard() {
 
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer)
-
-          if (typeof window !== 'undefined' && (window as any).XLSX) {
-            const XLSX = (window as any).XLSX
-            const workbook = XLSX.read(data, { type: 'array' })
-            const firstSheetName = workbook.SheetNames[0]
-            const worksheet = workbook.Sheets[firstSheetName]
-
-            const range = XLSX.utils.decode_range(worksheet['!ref'])
-            const headers: string[] = []
-
-            for (let col = range.s.c; col <= range.e.c; col++) {
-              const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
-              const cell = worksheet[cellAddress]
-              if (cell && cell.v) {
-                headers.push(String(cell.v).trim())
-              }
+          if (isCSVFile(file)) {
+            // Parse CSV
+            const text = e.target?.result as string
+            const rows = parseCSV(text)
+            
+            if (rows.length === 0) {
+              resolve({ isValid: false, error: 'CSV file is empty' })
+              return
             }
+
+            const headers = rows[0].map(h => h.trim())
 
             // Check if there are exactly 8 columns
             if (headers.length !== requiredColumns.length) {
@@ -108,24 +171,82 @@ export default function AddSuccessRateCard() {
 
             resolve({ isValid: true })
           } else {
-            resolve({ isValid: true })
+            // Parse Excel
+            const data = new Uint8Array(e.target?.result as ArrayBuffer)
+
+            if (typeof window !== 'undefined' && (window as any).XLSX) {
+              const XLSX = (window as any).XLSX
+              const workbook = XLSX.read(data, { type: 'array' })
+              const firstSheetName = workbook.SheetNames[0]
+              const worksheet = workbook.Sheets[firstSheetName]
+
+              const range = XLSX.utils.decode_range(worksheet['!ref'])
+              const headers: string[] = []
+
+              for (let col = range.s.c; col <= range.e.c; col++) {
+                const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
+                const cell = worksheet[cellAddress]
+                if (cell && cell.v) {
+                  headers.push(String(cell.v).trim())
+                }
+              }
+
+              // Check if there are exactly 8 columns
+              if (headers.length !== requiredColumns.length) {
+                resolve({
+                  isValid: false,
+                  error: `Invalid column count. Expected ${requiredColumns.length} columns, got ${headers.length}. Required columns: ${requiredColumns.join(', ')}`,
+                })
+                return
+              }
+
+              // Check if all required columns exist (case-insensitive)
+              const normalizedHeaders = headers.map((h) => h.toLowerCase())
+              const normalizedRequired = requiredColumns.map((r) =>
+                r.toLowerCase()
+              )
+
+              const missingColumns: string[] = []
+              normalizedRequired.forEach((required, index) => {
+                if (!normalizedHeaders.includes(required)) {
+                  missingColumns.push(requiredColumns[index])
+                }
+              })
+
+              if (missingColumns.length > 0) {
+                resolve({
+                  isValid: false,
+                  error: `Missing required columns: ${missingColumns.join(', ')}`,
+                })
+                return
+              }
+
+              resolve({ isValid: true })
+            } else {
+              resolve({ isValid: true })
+            }
           }
         } catch (error) {
-          console.error('Error validating Excel:', error)
-          resolve({ isValid: false, error: 'Failed to parse Excel file' })
+          console.error('Error validating file:', error)
+          resolve({ isValid: false, error: 'Failed to parse file' })
         }
       }
 
       reader.onerror = () =>
         resolve({ isValid: false, error: 'Failed to read file' })
-      reader.readAsArrayBuffer(file)
+      
+      if (isCSVFile(file)) {
+        reader.readAsText(file)
+      } else {
+        reader.readAsArrayBuffer(file)
+      }
     })
   }
 
   const handleFileSelect = async (file: File) => {
-    if (!isValidExcelFile(file)) {
+    if (!isValidFile(file)) {
       setMessage({
-        text: 'Please upload only Excel files (.xlsx or .xls)',
+        text: 'Please upload only Excel files (.xlsx or .xls) or CSV files (.csv)',
         type: 'error',
       })
       return
@@ -133,7 +254,7 @@ export default function AddSuccessRateCard() {
 
     setMessage({ text: 'Validating file columns...', type: 'info' })
 
-    const validationResult = await validateExcelColumns(file)
+    const validationResult = await validateFileColumns(file)
 
     if (validationResult.isValid) {
       setSelectedFile(file)
@@ -284,13 +405,13 @@ export default function AddSuccessRateCard() {
             <p className="text-xs font-medium text-gray-700">
               Drag & drop or click
             </p>
-            <p className="text-xs text-gray-400">Excel file</p>
+            <p className="text-xs text-gray-400">Excel or CSV file</p>
           </div>
         )}
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.csv"
           onChange={handleFileInputChange}
           className="hidden"
         />

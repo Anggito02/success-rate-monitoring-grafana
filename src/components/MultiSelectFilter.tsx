@@ -194,7 +194,7 @@ export default function MultiSelectFilter({
                   const allValues = filteredOptions.map((opt) => opt.value)
                   const newValues = allValues.every((val) => selectedValues.includes(val))
                     ? selectedValues.filter((val) => !allValues.includes(val))
-                    : [...new Set([...selectedValues, ...allValues])]
+                    : Array.from(new Set([...selectedValues, ...allValues]))
                   onChange(newValues)
                 }}
                 className="flex-1 px-2 py-1 text-[10px] font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"

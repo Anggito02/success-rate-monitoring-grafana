@@ -15,8 +15,10 @@ Buat file `.env` di root directory dengan konfigurasi berikut:
 
 ```env
 # Database Configuration
+# Note: DB_PORT adalah port HOST (default 3307 untuk menghindari konflik dengan MySQL lokal)
+# Di dalam container, MySQL tetap berjalan di port 3306
 DB_HOST=mysql
-DB_PORT=3306
+DB_PORT=3307
 DB_USER=grafana_user
 DB_PASSWORD=grafana_password
 DB_NAME=grafana_dashboard
@@ -42,7 +44,7 @@ docker-compose up -d --build
 ### 3. Akses Aplikasi
 
 - **Aplikasi**: http://localhost:3000
-- **MySQL**: localhost:3306
+- **MySQL (Docker)**: localhost:3307 (default, untuk menghindari konflik dengan MySQL lokal di port 3306)
 
 ## 📝 Docker Commands
 
@@ -101,7 +103,7 @@ docker-compose -f docker-compose.dev.yml up -d
 
 # Setup .env.local untuk development
 DB_HOST=localhost
-DB_PORT=3306
+DB_PORT=3307
 DB_USER=grafana_user
 DB_PASSWORD=grafana_password
 DB_NAME=grafana_dashboard
@@ -152,11 +154,13 @@ Atau gunakan fitur "Restart Database" di aplikasi.
 ## 🐛 Troubleshooting
 
 ### Port Already in Use
-Jika port 3000 atau 3306 sudah digunakan, ubah di `.env`:
+Jika port 3000 atau 3307 sudah digunakan, ubah di `.env`:
 ```env
 APP_PORT=3001
-DB_PORT=3307
+DB_PORT=3308
 ```
+
+**Catatan**: Default port MySQL Docker adalah 3307 untuk menghindari konflik dengan MySQL lokal yang biasanya berjalan di port 3306. Jika Anda tidak punya MySQL lokal, Anda bisa mengubah `DB_PORT=3306` di file `.env`.
 
 ### Database Connection Error
 1. Pastikan MySQL container sudah running: `docker-compose ps`

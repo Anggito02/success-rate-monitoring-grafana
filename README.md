@@ -86,6 +86,8 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## 🏗️ Build & Production
 
+### Traditional Build
+
 ```bash
 # Build for production
 npm run build
@@ -93,6 +95,21 @@ npm run build
 # Start production server
 npm start
 ```
+
+### Docker Deployment
+
+Aplikasi ini sudah dilengkapi dengan Docker setup untuk memudahkan deployment.
+
+**Quick Start:**
+```bash
+# 1. Buat file .env dengan konfigurasi database
+# 2. Build dan run dengan Docker Compose
+docker-compose up -d --build
+
+# 3. Akses aplikasi di http://localhost:3000
+```
+
+**Untuk informasi lengkap tentang Docker setup, lihat [DOCKER.md](./DOCKER.md)**
 
 ## 📝 Features
 

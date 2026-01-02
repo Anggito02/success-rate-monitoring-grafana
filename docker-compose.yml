@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: dashboard-grafana-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-grafana_dashboard}
+      MYSQL_USER: ${DB_USER:-grafana_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-grafana_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dashboard-network
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dashboard-grafana-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=${DB_USER:-grafana_user}
+      - DB_PASSWORD=${DB_PASSWORD:-grafana_password}
+      - DB_NAME=${DB_NAME:-grafana_dashboard}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./public/uploads:/app/public/uploads
+    networks:
+      - dashboard-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  dashboard-network:
+    driver: bridge
+

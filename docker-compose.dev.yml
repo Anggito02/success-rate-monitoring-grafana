@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # MySQL Database (same as production)
+  mysql:
+    image: mysql:8.0
+    container_name: dashboard-grafana-mysql-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-grafana_dashboard}
+      MYSQL_USER: ${DB_USER:-grafana_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-grafana_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dashboard-network-dev
+
+volumes:
+  mysql_data_dev:
+    driver: local
+
+networks:
+  dashboard-network-dev:
+    driver: bridge
+

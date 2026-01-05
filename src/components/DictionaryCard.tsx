@@ -21,6 +21,13 @@ export default function DictionaryCard() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingErrorType, setEditingErrorType] = useState<'S' | 'N' | 'Sukses' | ''>('')
   const [updatingId, setUpdatingId] = useState<number | null>(null)
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set())
+  const [editingDescriptionId, setEditingDescriptionId] = useState<number | null>(null)
+  const [editingDescription, setEditingDescription] = useState<string>('')
+  const [bulkDescription, setBulkDescription] = useState<string>('')
+  const [submittingDescription, setSubmittingDescription] = useState<number | null>(null)
+  const [submittingBulkDescription, setSubmittingBulkDescription] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const limit = 25
 
   const loadApplications = async () => {
@@ -63,6 +70,9 @@ export default function DictionaryCard() {
           setTotalCount(result.total || result.data.length)
           setTotalPages(result.totalPages || Math.ceil((result.total || result.data.length) / limit))
           
+          // Reset selections when data changes
+          setSelectedItems(new Set())
+          
           // Extract unique jenis_transaksi values from all data
           const uniqueJenis = Array.from(
             new Set(
@@ -92,16 +102,19 @@ export default function DictionaryCard() {
     // Listen for data changes
     const handleDataChange = () => {
       setCurrentPage(1)
+      loadDictionary(1, false)
     }
 
     window.addEventListener('dictionaryUploaded', handleDataChange)
     window.addEventListener('unmappedRcSubmitted', handleDataChange)
+    window.addEventListener('dictionaryUpdated', handleDataChange)
 
     return () => {
       window.removeEventListener('dictionaryUploaded', handleDataChange)
       window.removeEventListener('unmappedRcSubmitted', handleDataChange)
+      window.removeEventListener('dictionaryUpdated', handleDataChange)
     }
-  }, [])
+  }, [loadDictionary])
 
   useEffect(() => {
     // Reset to page 1 when filters change
@@ -184,58 +197,203 @@ export default function DictionaryCard() {
     }
   }
 
-  const exportToCSV = async () => {
-    // Fetch all data for export (not just current page)
-    await loadDictionary(1, true)
-    
-    if (allDictionaryEntries.length === 0) {
-      setError('No data to export')
+  const handleEditDescription = (entry: DictionaryViewEntry) => {
+    setEditingDescriptionId(entry.id)
+    setEditingDescription(entry.rc_description || '')
+  }
+
+  const handleCancelEditDescription = () => {
+    setEditingDescriptionId(null)
+    setEditingDescription('')
+  }
+
+  const handleUpdateDescription = async (id: number, newDescription: string) => {
+    try {
+      setSubmittingDescription(id)
+      setError(null)
+      setMessage(null)
+
+      const response = await fetch('/api/dictionary/update-description', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          rc_description: newDescription,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setMessage({ text: result.message || 'RC description updated successfully', type: 'success' })
+        // Reload data to get updated rc_description
+        loadDictionary(currentPage, false)
+        setEditingDescriptionId(null)
+        setEditingDescription('')
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('dictionaryUpdated'))
+      } else {
+        throw new Error(result.message || 'Failed to update RC description')
+      }
+    } catch (err: any) {
+      setMessage({ text: err.message, type: 'error' })
+    } finally {
+      setSubmittingDescription(null)
+    }
+  }
+
+  const handleSelectItem = (id: number) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedItems.size === dictionaryEntries.length) {
+      setSelectedItems(new Set())
+    } else {
+      setSelectedItems(new Set(dictionaryEntries.map(entry => entry.id)))
+    }
+  }
+
+  const handleBulkUpdateDescription = async () => {
+    if (selectedItems.size === 0) {
+      setMessage({ text: 'Please select at least one entry to update', type: 'error' })
       return
     }
 
-    // Prepare CSV headers
-    const headers = ['App Name', 'RC', 'RC Description', 'Error Type', 'Jenis Transaksi']
-    
-    // Prepare CSV rows from all data
-    const rows = allDictionaryEntries.map((entry) => [
-      entry.app_name || '',
-      entry.rc || '',
-      entry.rc_description || '',
-      entry.error_type || '',
-      entry.jenis_transaksi || '',
-    ])
+    if (!bulkDescription.trim()) {
+      setMessage({ text: 'Please enter a description', type: 'error' })
+      return
+    }
 
-    // Convert to CSV format
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) =>
-        row.map((cell) => {
-          // Escape commas and quotes, wrap in quotes if needed
-          const cellStr = String(cell).replace(/"/g, '""')
-          if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-            return `"${cellStr}"`
-          }
-          return cellStr
-        }).join(',')
-      ),
-    ].join('\n')
+    try {
+      setSubmittingBulkDescription(true)
+      setMessage(null)
+      setError(null)
 
-    // Create blob and download
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-    const filename = `dictionary_export_${timestamp}.csv`
-    
-    link.setAttribute('href', url)
-    link.setAttribute('download', filename)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+      const updates = Array.from(selectedItems).map(id => ({
+        id,
+        rc_description: bulkDescription.trim(),
+      }))
+
+      const response = await fetch('/api/dictionary/update-description-batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ updates }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setMessage({ 
+          text: result.message || `Successfully updated ${result.data?.success || updates.length} RC description(s)`, 
+          type: 'success' 
+        })
+        // Reload data
+        loadDictionary(currentPage, false)
+        // Clear selections
+        setSelectedItems(new Set())
+        setBulkDescription('')
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('dictionaryUpdated'))
+      } else {
+        throw new Error(result.message || 'Failed to update RC descriptions')
+      }
+    } catch (err: any) {
+      setMessage({ text: err.message, type: 'error' })
+    } finally {
+      setSubmittingBulkDescription(false)
+    }
+  }
+
+  const exportToCSV = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      // Fetch all data for export with current filters applied
+      const params = new URLSearchParams()
+      if (searchQuery) params.append('search', searchQuery)
+      if (selectedAppIds.length > 0) params.append('app_id', selectedAppIds.join(','))
+      if (selectedErrorTypes.length > 0) params.append('error_type', selectedErrorTypes.join(','))
+      if (selectedJenisTransaksi.length > 0) params.append('jenis_transaksi', selectedJenisTransaksi.join(','))
+      
+      const response = await fetch(`/api/dictionary?${params.toString()}`)
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to load dictionary for export')
+      }
+
+      const exportData = result.data || []
+      
+      if (exportData.length === 0) {
+        setError('No data to export with current filters')
+        return
+      }
+
+      // Prepare CSV headers
+      const headers = ['App Name', 'RC', 'RC Description', 'Error Type', 'Jenis Transaksi']
+      
+      // Prepare CSV rows from filtered data
+      const rows = exportData.map((entry: DictionaryViewEntry) => [
+        entry.app_name || '',
+        entry.rc || '',
+        entry.rc_description || '',
+        entry.error_type || '',
+        entry.jenis_transaksi || '',
+      ])
+
+      // Convert to CSV format
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row) =>
+          row.map((cell) => {
+            // Escape commas and quotes, wrap in quotes if needed
+            const cellStr = String(cell).replace(/"/g, '""')
+            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+              return `"${cellStr}"`
+            }
+            return cellStr
+          }).join(',')
+        ),
+      ].join('\n')
+
+      // Create blob and download
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      
+      // Generate filename with timestamp and filter info
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+      const filterInfo = selectedAppIds.length > 0 
+        ? `_app-${selectedAppIds.join('-')}` 
+        : ''
+      const filename = `dictionary_export${filterInfo}_${timestamp}.csv`
+      
+      link.setAttribute('href', url)
+      link.setAttribute('download', filename)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      setError(err.message || 'Failed to export data')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -364,6 +522,90 @@ export default function DictionaryCard() {
         </div>
       </div>
 
+      {/* Message Display */}
+      {message && (
+        <div
+          className={`mb-2 p-2 rounded-md text-xs font-medium shadow-md transform transition-all animate-slide-in ${
+            message.type === 'success'
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200'
+              : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-800 border border-red-200'
+          }`}
+        >
+          <div className={`flex gap-1.5 ${message.type === 'error' ? 'items-start' : 'items-center'}`}>
+            {message.type === 'success' ? (
+              <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            )}
+            <span className={`flex-1 ${message.type === 'error' ? 'break-words whitespace-normal' : 'truncate'}`}>{message.text}</span>
+            <button
+              type="button"
+              onClick={() => setMessage(null)}
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Update Description Controls */}
+      {selectedItems.size > 0 && (
+        <div className="mb-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-md border border-blue-200">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-blue-800">
+              {selectedItems.size} item(s) selected
+            </span>
+            <input
+              type="text"
+              placeholder="Enter description for selected items..."
+              value={bulkDescription}
+              onChange={(e) => setBulkDescription(e.target.value)}
+              className="flex-1 min-w-[200px] px-2 py-1 text-xs rounded border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <button
+              type="button"
+              onClick={handleBulkUpdateDescription}
+              disabled={submittingBulkDescription || !bulkDescription.trim()}
+              className="px-2 py-1 rounded text-xs font-semibold transition-all duration-200 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              {submittingBulkDescription ? (
+                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Update All
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedItems(new Set())
+                setBulkDescription('')
+              }}
+              className="px-2 py-1 rounded text-xs font-semibold transition-all duration-200 bg-gray-500 text-white hover:bg-gray-600 flex items-center gap-1"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Dictionary List */}
       <div className="flex-1 overflow-y-auto mb-1.5 border border-gray-200/50 rounded-md bg-white/60 backdrop-blur-sm shadow-inner min-h-0">
         {isLoading ? (
@@ -390,8 +632,19 @@ export default function DictionaryCard() {
         ) : (
           <div className="flex flex-col h-full min-h-0">
             {/* Total Count Header - Fixed at top */}
-            <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white text-xs font-bold text-center py-1.5 px-2 rounded-t-md backdrop-blur-sm flex-shrink-0">
-              Showing {dictionaryEntries.length} of {totalCount} entries (Page {currentPage} of {totalPages})
+            <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white text-xs font-bold py-1.5 px-2 rounded-t-md backdrop-blur-sm flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <span>Showing {dictionaryEntries.length} of {totalCount} entries (Page {currentPage} of {totalPages})</span>
+                <label className="flex items-center gap-1 cursor-pointer text-xs font-normal">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.size === dictionaryEntries.length && dictionaryEntries.length > 0}
+                    onChange={handleSelectAll}
+                    className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
             </div>
             
             {/* Scrollable Table Container */}
@@ -399,6 +652,14 @@ export default function DictionaryCard() {
               <table className="w-full text-xs">
                 <thead className="bg-gray-100/90 sticky top-0 z-20 shadow-sm">
                   <tr>
+                    <th className="px-2 py-1.5 text-center font-semibold text-gray-700 border-b-2 border-gray-300 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.size === dictionaryEntries.length && dictionaryEntries.length > 0}
+                        onChange={handleSelectAll}
+                        className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b-2 border-gray-300">App</th>
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b-2 border-gray-300">RC</th>
                     <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-b-2 border-gray-300">Description</th>
@@ -411,13 +672,88 @@ export default function DictionaryCard() {
                   {dictionaryEntries.map((entry, index) => (
                     <tr
                       key={entry.id}
-                      className="border-b border-gray-200/50 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-colors duration-150"
+                      className={`border-b border-gray-200/50 transition-colors duration-150 ${
+                        selectedItems.has(entry.id)
+                          ? 'bg-gradient-to-r from-blue-100 to-blue-50'
+                          : 'hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100'
+                      }`}
                       style={{ animationDelay: `${index * 0.02}s` }}
                     >
+                      <td className="px-2 py-1.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(entry.id)}
+                          onChange={() => handleSelectItem(entry.id)}
+                          className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-2 py-1.5 font-medium text-gray-800">{entry.app_name}</td>
                       <td className="px-2 py-1.5 font-mono text-gray-700">{entry.rc || '-'}</td>
-                      <td className="px-2 py-1.5 text-gray-600 max-w-[150px] truncate" title={entry.rc_description || ''}>
-                        {entry.rc_description || '-'}
+                      <td className="px-2 py-1.5 text-gray-600 max-w-[150px]">
+                        {editingDescriptionId === entry.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={editingDescription}
+                              onChange={(e) => setEditingDescription(e.target.value)}
+                              className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUpdateDescription(entry.id, editingDescription)
+                                } else if (e.key === 'Escape') {
+                                  handleCancelEditDescription()
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDescription(entry.id, editingDescription)}
+                              disabled={submittingDescription === entry.id}
+                              className="px-1.5 py-1 rounded text-xs font-semibold transition-all duration-200 bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Save"
+                            >
+                              {submittingDescription === entry.id ? (
+                                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEditDescription}
+                              disabled={submittingDescription === entry.id}
+                              className="px-1.5 py-1 rounded text-xs font-semibold transition-all duration-200 bg-gray-500 text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Cancel"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 group">
+                            <span className="truncate flex-1" title={entry.rc_description || ''}>
+                              {entry.rc_description || '-'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleEditDescription(entry)}
+                              disabled={submittingDescription === entry.id || editingDescriptionId !== null}
+                              className="opacity-0 group-hover:opacity-100 px-1 py-0.5 rounded text-xs font-semibold transition-all duration-200 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-0 disabled:cursor-not-allowed"
+                              title="Edit description"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="px-2 py-1.5">
                         {editingId === entry.id ? (

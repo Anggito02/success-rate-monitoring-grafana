@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
     let dictionaryData: Array<{
       jenis_transaksi: string
       rc: string
+      rc_description: string | null
       error_type: 'S' | 'N' | 'Sukses'
     }> = []
 
@@ -126,12 +127,12 @@ export async function POST(request: NextRequest) {
       // Get headers from first row
       const headers = rows[0].map(h => h.trim())
 
-      // Validate columns
-      if (headers.length !== 3) {
+      // Validate columns - now expect 4 columns (with RC Description)
+      if (headers.length < 3 || headers.length > 4) {
         return NextResponse.json(
           {
             success: false,
-            message: `Invalid column count. Expected 3 columns, got ${headers.length}`,
+            message: `Invalid column count. Expected 3-4 columns (Jenis Transaksi, RC, S/N, [RC Description]), got ${headers.length}`,
           } as ApiResponse,
           { status: 400 }
         )
@@ -140,6 +141,7 @@ export async function POST(request: NextRequest) {
       // Check required columns (case-insensitive)
       const normalizedHeaders = headers.map((h) => h.toLowerCase())
       const requiredColumns = ['jenis transaksi', 'rc', 's/n']
+      const optionalColumns = ['rc description']
 
       const missingColumns = requiredColumns.filter(
         (required) => !normalizedHeaders.includes(required)
@@ -159,6 +161,9 @@ export async function POST(request: NextRequest) {
       const jenisTransaksiIndex = normalizedHeaders.indexOf('jenis transaksi')
       const rcIndex = normalizedHeaders.indexOf('rc')
       const snIndex = normalizedHeaders.indexOf('s/n')
+      const rcDescriptionIndex = normalizedHeaders.includes('rc description') 
+        ? normalizedHeaders.indexOf('rc description') 
+        : -1
 
       // Process CSV rows (skip header row)
       for (let rowNum = 1; rowNum < rows.length; rowNum++) {
@@ -168,6 +173,9 @@ export async function POST(request: NextRequest) {
         const jenisTransaksi = (row[jenisTransaksiIndex] || '').trim()
         const rc = (row[rcIndex] || '').trim()
         const rawSn = (row[snIndex] || '').trim().toUpperCase()
+        const rcDescription = rcDescriptionIndex >= 0 && row[rcDescriptionIndex] 
+          ? (row[rcDescriptionIndex] || '').trim() 
+          : null
 
         // Map S/N values to error_type
         let errorType: 'S' | 'N' | 'Sukses' | null = null
@@ -191,6 +199,7 @@ export async function POST(request: NextRequest) {
         dictionaryData.push({
           jenis_transaksi: jenisTransaksi,
           rc: rc,
+          rc_description: rcDescription || null,
           error_type: errorType,
         })
       }
@@ -225,12 +234,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Validate columns
-      if (headers.length !== 3) {
+      // Validate columns - now expect 3-4 columns (with optional RC Description)
+      if (headers.length < 3 || headers.length > 4) {
         return NextResponse.json(
           {
             success: false,
-            message: `Invalid column count. Expected 3 columns, got ${headers.length}`,
+            message: `Invalid column count. Expected 3-4 columns (Jenis Transaksi, RC, S/N, [RC Description]), got ${headers.length}`,
           } as ApiResponse,
           { status: 400 }
         )
@@ -239,6 +248,7 @@ export async function POST(request: NextRequest) {
       // Check required columns (case-insensitive)
       const normalizedHeaders = headers.map((h) => h.toLowerCase())
       const requiredColumns = ['jenis transaksi', 'rc', 's/n']
+      const optionalColumns = ['rc description']
 
       const missingColumns = requiredColumns.filter(
         (required) => !normalizedHeaders.includes(required)
@@ -258,6 +268,9 @@ export async function POST(request: NextRequest) {
       const jenisTransaksiIndex = normalizedHeaders.indexOf('jenis transaksi')
       const rcIndex = normalizedHeaders.indexOf('rc')
       const snIndex = normalizedHeaders.indexOf('s/n')
+      const rcDescriptionIndex = normalizedHeaders.includes('rc description') 
+        ? normalizedHeaders.indexOf('rc description') 
+        : -1
 
       // Collect data from rows (skip header row)
       dictionaryData = []
@@ -267,6 +280,9 @@ export async function POST(request: NextRequest) {
           worksheet[XLSX.utils.encode_cell({ r: rowNum, c: jenisTransaksiIndex })]
         const rcCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcIndex })]
         const snCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: snIndex })]
+        const rcDescriptionCell = rcDescriptionIndex >= 0
+          ? worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcDescriptionIndex })]
+          : null
 
         const jenisTransaksi =
           jenisTransaksiCell && jenisTransaksiCell.v
@@ -275,6 +291,9 @@ export async function POST(request: NextRequest) {
         const rc = rcCell && rcCell.v ? String(rcCell.v).trim() : ''
         const rawSn =
           snCell && snCell.v ? String(snCell.v).trim().toUpperCase() : ''
+        const rcDescription = rcDescriptionCell && rcDescriptionCell.v
+          ? String(rcDescriptionCell.v).trim()
+          : null
 
         // Map S/N values to error_type
         let errorType: 'S' | 'N' | 'Sukses' | null = null
@@ -298,6 +317,7 @@ export async function POST(request: NextRequest) {
         dictionaryData.push({
           jenis_transaksi: jenisTransaksi,
           rc: rc,
+          rc_description: rcDescription || null,
           error_type: errorType,
         })
       }
@@ -336,10 +356,11 @@ export async function POST(request: NextRequest) {
 
       // Use INSERT IGNORE or ON DUPLICATE KEY UPDATE to handle duplicates
       const insertQuery = `
-        INSERT INTO response_code_dictionary (id_app_identifier, jenis_transaksi, rc, error_type)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO response_code_dictionary (id_app_identifier, jenis_transaksi, rc, rc_description, error_type)
+        VALUES (?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
-        error_type = VALUES(error_type)
+        error_type = VALUES(error_type),
+        rc_description = COALESCE(VALUES(rc_description), rc_description)
       `
 
       for (const entry of dictionaryData) {
@@ -347,6 +368,7 @@ export async function POST(request: NextRequest) {
           applicationId,
           entry.jenis_transaksi,
           entry.rc,
+          entry.rc_description,
           entry.error_type,
         ])
       }

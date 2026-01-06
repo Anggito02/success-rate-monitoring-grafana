@@ -331,7 +331,7 @@ export default function DictionaryCard() {
       
       const response = await fetch(`/api/dictionary?${params.toString()}`)
       const result = await response.json()
-
+    
       if (!result.success) {
         throw new Error(result.message || 'Failed to load dictionary for export')
       }
@@ -340,55 +340,55 @@ export default function DictionaryCard() {
       
       if (exportData.length === 0) {
         setError('No data to export with current filters')
-        return
-      }
+      return
+    }
 
-      // Prepare CSV headers
-      const headers = ['App Name', 'RC', 'RC Description', 'Error Type', 'Jenis Transaksi']
-      
+    // Prepare CSV headers
+    const headers = ['App Name', 'RC', 'RC Description', 'Error Type', 'Jenis Transaksi']
+    
       // Prepare CSV rows from filtered data
       const rows = exportData.map((entry: DictionaryViewEntry) => [
-        entry.app_name || '',
-        entry.rc || '',
-        entry.rc_description || '',
-        entry.error_type || '',
-        entry.jenis_transaksi || '',
-      ])
+      entry.app_name || '',
+      entry.rc || '',
+      entry.rc_description || '',
+      entry.error_type || '',
+      entry.jenis_transaksi || '',
+    ])
 
-      // Convert to CSV format
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row) =>
-          row.map((cell) => {
-            // Escape commas and quotes, wrap in quotes if needed
-            const cellStr = String(cell).replace(/"/g, '""')
-            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-              return `"${cellStr}"`
-            }
-            return cellStr
-          }).join(',')
-        ),
-      ].join('\n')
+    // Convert to CSV format
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) =>
+        row.map((cell) => {
+          // Escape commas and quotes, wrap in quotes if needed
+          const cellStr = String(cell).replace(/"/g, '""')
+          if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+            return `"${cellStr}"`
+          }
+          return cellStr
+        }).join(',')
+      ),
+    ].join('\n')
 
-      // Create blob and download
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
-      const link = document.createElement('a')
-      const url = URL.createObjectURL(blob)
-      
+    // Create blob and download
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
       // Generate filename with timestamp and filter info
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
       const filterInfo = selectedAppIds.length > 0 
         ? `_app-${selectedAppIds.join('-')}` 
         : ''
       const filename = `dictionary_export${filterInfo}_${timestamp}.csv`
-      
-      link.setAttribute('href', url)
-      link.setAttribute('download', filename)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
     } catch (err: any) {
       setError(err.message || 'Failed to export data')
     } finally {
@@ -739,7 +739,7 @@ export default function DictionaryCard() {
                         ) : (
                           <div className="flex items-center gap-1 group">
                             <span className="truncate flex-1" title={entry.rc_description || ''}>
-                              {entry.rc_description || '-'}
+                        {entry.rc_description || '-'}
                             </span>
                             <button
                               type="button"

@@ -16,6 +16,7 @@ export default function DictionaryUploadCard() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const requiredColumns = ['Jenis Transaksi', 'RC', 'S/N']
+  const optionalColumns = ['RC Description']
 
   useEffect(() => {
     loadApplications()
@@ -128,8 +129,8 @@ export default function DictionaryUploadCard() {
 
             const headers = rows[0].map(h => h.trim())
 
-            // Check if there are exactly 3 columns
-            if (headers.length !== 3) {
+            // Check if there are 3-4 columns (required + optional)
+            if (headers.length < 3 || headers.length > 4) {
               resolve(false)
               return
             }
@@ -156,7 +157,7 @@ export default function DictionaryUploadCard() {
               const firstSheetName = workbook.SheetNames[0]
               const worksheet = workbook.Sheets[firstSheetName]
 
-              const range = XLSX.utils.decode_range(worksheet['!ref'])
+              const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
               const headers: string[] = []
 
               for (let col = range.s.c; col <= range.e.c; col++) {
@@ -167,8 +168,8 @@ export default function DictionaryUploadCard() {
                 }
               }
 
-              // Check if there are exactly 3 columns
-              if (headers.length !== 3) {
+              // Check if there are 3-4 columns
+              if (headers.length < 3 || headers.length > 4) {
                 resolve(false)
                 return
               }
@@ -226,7 +227,7 @@ export default function DictionaryUploadCard() {
       })
     } else {
       setMessage({
-        text: `Invalid file format. Excel must have exactly 3 columns: "${requiredColumns.join('", "')}"`,
+        text: `Invalid file format. File must have 3-4 columns: "${requiredColumns.join('", "')}"${optionalColumns.length > 0 ? `, and optionally "${optionalColumns.join('", "')}"` : ''}`,
         type: 'error',
       })
       setSelectedFile(null)
@@ -292,7 +293,12 @@ export default function DictionaryUploadCard() {
         setMessage({ text: result.message, type: 'success' })
         // Dispatch event to notify other components
         window.dispatchEvent(new CustomEvent('dictionaryUploaded'))
-        // Don't auto-reset, let user manually start new upload
+        // Reset form
+        setSelectedFile(null)
+        setSelectedAppId('')
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
       } else {
         throw new Error(result.message || 'Upload failed')
       }
@@ -347,40 +353,46 @@ export default function DictionaryUploadCard() {
               ? 'border-red-500 bg-gradient-to-br from-red-100 to-red-50 scale-105'
               : 'border-gray-300 bg-gradient-to-br from-gray-50 to-red-50 hover:border-red-400 hover:from-red-50 hover:to-red-100'
           }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        {selectedFile ? (
-          <div className="space-y-0.5">
-            <svg className="w-6 h-6 text-red-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-xs font-semibold text-gray-700 truncate px-1">
-              {selectedFile.name}
-            </p>
-            <p className="text-xs text-gray-500">Click to change</p>
-          </div>
-        ) : (
-          <div className="space-y-0.5">
-            <svg className="w-8 h-8 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <p className="text-xs font-medium text-gray-700">
-              Drag & drop or click
-            </p>
-            <p className="text-xs text-gray-400">Excel or CSV file</p>
-          </div>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          onChange={handleFileInputChange}
-          className="hidden"
-        />
-      </div>
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {selectedFile ? (
+            <div className="space-y-0.5">
+              <svg className="w-6 h-6 text-red-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs font-semibold text-gray-700 truncate px-1">
+                {selectedFile.name}
+              </p>
+              <p className="text-xs text-gray-500">Click to change</p>
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              <svg className="w-8 h-8 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p className="text-xs font-medium text-gray-700">
+                Drag & drop or click
+              </p>
+              <p className="text-xs text-gray-400">Excel or CSV file</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Required: {requiredColumns.join(', ')}
+              </p>
+              <p className="text-xs text-gray-400">
+                Optional: {optionalColumns.join(', ')}
+              </p>
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileInputChange}
+            className="hidden"
+          />
+        </div>
       </div>
 
       {message && (
@@ -419,24 +431,24 @@ export default function DictionaryUploadCard() {
         disabled={isLoading || !selectedAppId || !selectedFile}
         className="w-full px-2.5 py-1.5 rounded-md font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-red-600 via-red-700 to-red-800 text-white hover:from-red-700 hover:via-red-800 hover:to-red-900 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 relative overflow-hidden group mt-auto"
       >
-          <span className="relative z-10 flex items-center justify-center gap-1.5">
-            {isLoading ? (
-              <>
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Uploading...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                Upload
-              </>
-            )}
-          </span>
+        <span className="relative z-10 flex items-center justify-center gap-1.5">
+          {isLoading ? (
+            <>
+              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Uploading...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Upload
+            </>
+          )}
+        </span>
         <div className="absolute inset-0 bg-white/20 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300" />
       </button>
 

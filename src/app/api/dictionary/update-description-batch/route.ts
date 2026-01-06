@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
         success: 0,
         failed: 0,
         errors: [] as string[],
-        totalAffectedRows: 0,
       }
 
       // Process each update
@@ -71,29 +70,11 @@ export async function POST(request: NextRequest) {
             continue
           }
 
-          const entry = entryResult[0]
-
-          // Update rc_description in app_success_rate table
-          let updateQuery: string
-          let updateParams: any[]
-          
-          if (entry.jenis_transaksi && entry.jenis_transaksi !== '') {
-            updateQuery = `UPDATE app_success_rate 
-             SET rc_description = ?
-             WHERE id_app_identifier = ? 
-               AND rc = ? 
-               AND jenis_transaksi = ?`
-            updateParams = [rc_description || null, entry.id_app_identifier, entry.rc, entry.jenis_transaksi]
-          } else {
-            updateQuery = `UPDATE app_success_rate 
-             SET rc_description = ?
-             WHERE id_app_identifier = ? 
-               AND rc = ?`
-            updateParams = [rc_description || null, entry.id_app_identifier, entry.rc]
-          }
-          
-          const [updateResult]: any = await connection.execute(updateQuery, updateParams)
-          results.totalAffectedRows += updateResult.affectedRows || 0
+          // Update rc_description directly in response_code_dictionary table
+          await connection.execute(
+            'UPDATE response_code_dictionary SET rc_description = ? WHERE id = ?',
+            [rc_description || null, id]
+          )
           results.success++
         } catch (error: any) {
           results.failed++
@@ -110,10 +91,9 @@ export async function POST(request: NextRequest) {
         data: {
           success: results.success,
           failed: results.failed,
-          totalAffectedRows: results.totalAffectedRows,
           errors: results.errors,
         },
-      } as ApiResponse & { data: { success: number; failed: number; totalAffectedRows: number; errors: string[] } })
+      } as ApiResponse & { data: { success: number; failed: number; errors: string[] } })
     } catch (error) {
       // Rollback on error
       await connection.rollback()

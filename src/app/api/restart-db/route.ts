@@ -74,6 +74,7 @@ export async function POST() {
           id_app_identifier INT NOT NULL,
           jenis_transaksi VARCHAR(255),
           rc VARCHAR(50),
+          rc_description VARCHAR(500),
           error_type ENUM('S', 'N', 'Sukses') NOT NULL,
           FOREIGN KEY (id_app_identifier) REFERENCES app_identifier(id) ON DELETE CASCADE,
           UNIQUE KEY unique_dictionary_entry (id_app_identifier, jenis_transaksi, rc)

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const connection = await pool.getConnection()
     try {
-      // Build query with filters - Simplified LEFT JOIN without complex NULL logic
+      // Build query with filters - Get rc_description directly from dictionary table
       let query = `
         SELECT DISTINCT
           d.id,
@@ -29,21 +29,10 @@ export async function GET(request: NextRequest) {
           a.app_name,
           d.jenis_transaksi,
           d.rc,
-          asr_desc.rc_description,
+          d.rc_description,
           d.error_type
         FROM response_code_dictionary d
         INNER JOIN app_identifier a ON d.id_app_identifier = a.id
-        LEFT JOIN (
-          SELECT DISTINCT
-            id_app_identifier,
-            COALESCE(jenis_transaksi, '') as jenis_transaksi,
-            rc,
-            rc_description
-          FROM app_success_rate
-          WHERE rc_description IS NOT NULL
-        ) asr_desc ON asr_desc.id_app_identifier = d.id_app_identifier 
-          AND asr_desc.rc = d.rc
-          AND COALESCE(asr_desc.jenis_transaksi, '') = COALESCE(d.jenis_transaksi, '')
         WHERE 1=1
       `
 
@@ -80,8 +69,8 @@ export async function GET(request: NextRequest) {
           OR d.jenis_transaksi LIKE ? 
           OR a.app_name LIKE ?
           OR (
-            asr_desc.rc_description IS NOT NULL 
-            AND asr_desc.rc_description LIKE ?
+            d.rc_description IS NOT NULL 
+            AND d.rc_description LIKE ?
           )
         )`
         const searchPattern = `%${search}%`
@@ -126,13 +115,9 @@ export async function GET(request: NextRequest) {
           d.rc LIKE ? 
           OR d.jenis_transaksi LIKE ? 
           OR a.app_name LIKE ?
-          OR EXISTS (
-            SELECT 1 FROM app_success_rate asr 
-            WHERE asr.id_app_identifier = d.id_app_identifier 
-              AND asr.rc = d.rc 
-              AND COALESCE(asr.jenis_transaksi, '') = COALESCE(d.jenis_transaksi, '')
-              AND asr.rc_description IS NOT NULL
-              AND asr.rc_description LIKE ?
+          OR (
+            d.rc_description IS NOT NULL 
+            AND d.rc_description LIKE ?
           )
         )`
         const searchPattern = `%${search}%`

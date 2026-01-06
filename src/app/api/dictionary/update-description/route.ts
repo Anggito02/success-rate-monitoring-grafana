@@ -49,27 +49,11 @@ export async function PATCH(request: NextRequest) {
 
       const entry = entryResult[0]
 
-      // Update rc_description in app_success_rate table for matching entries
-      // Build query based on whether jenis_transaksi is provided
-      let updateQuery: string
-      let updateParams: any[]
-      
-      if (entry.jenis_transaksi && entry.jenis_transaksi !== '') {
-        updateQuery = `UPDATE app_success_rate 
-         SET rc_description = ?
-         WHERE id_app_identifier = ? 
-           AND rc = ? 
-           AND jenis_transaksi = ?`
-        updateParams = [rc_description || null, entry.id_app_identifier, entry.rc, entry.jenis_transaksi]
-      } else {
-        updateQuery = `UPDATE app_success_rate 
-         SET rc_description = ?
-         WHERE id_app_identifier = ? 
-           AND rc = ?`
-        updateParams = [rc_description || null, entry.id_app_identifier, entry.rc]
-      }
-      
-      const [updateResult]: any = await connection.execute(updateQuery, updateParams)
+      // Update rc_description directly in response_code_dictionary table
+      await connection.execute(
+        'UPDATE response_code_dictionary SET rc_description = ? WHERE id = ?',
+        [rc_description || null, id]
+      )
 
       return NextResponse.json({
         success: true,
@@ -77,7 +61,6 @@ export async function PATCH(request: NextRequest) {
         data: {
           id,
           rc_description: rc_description || null,
-          affectedRows: updateResult.affectedRows,
         },
       } as ApiResponse)
     } finally {

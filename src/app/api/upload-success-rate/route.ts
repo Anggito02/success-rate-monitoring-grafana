@@ -74,12 +74,12 @@ const requiredColumns = [
   'Tanggal Transaksi',
   'Jenis Transaksi',
   'RC',
-  'RC Description',
   'total transaksi',
   'Total Nominal',
   'Total Biaya Admin',
   'Status Transaksi',
 ]
+const optionalColumns = ['RC Description']
 
 export async function POST(request: NextRequest) {
   try {
@@ -134,12 +134,12 @@ export async function POST(request: NextRequest) {
       // Get headers from first row
       headers = rows[0].map(h => h.trim())
 
-      // Validate columns
-      if (headers.length !== requiredColumns.length) {
+      // Validate columns - accept 7-8 columns (7 required + 1 optional RC Description)
+      if (headers.length < requiredColumns.length || headers.length > requiredColumns.length + optionalColumns.length) {
         return NextResponse.json(
           {
             success: false,
-            message: `Invalid column count. Expected ${requiredColumns.length} columns, got ${headers.length}. Required columns: ${requiredColumns.join(', ')}`,
+            message: `Invalid column count. Expected ${requiredColumns.length}-${requiredColumns.length + optionalColumns.length} columns (${requiredColumns.length} required + ${optionalColumns.length} optional), got ${headers.length}. Required columns: ${requiredColumns.join(', ')}${optionalColumns.length > 0 ? `. Optional: ${optionalColumns.join(', ')}` : ''}`,
           } as ApiResponse,
           { status: 400 }
         )
@@ -163,10 +163,18 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Find column indices
+      // Find column indices for required columns
       const columnIndices: Record<string, number> = {}
       requiredColumns.forEach((colName) => {
         columnIndices[colName] = normalizedHeaders.indexOf(colName.toLowerCase())
+      })
+      
+      // Find optional column indices
+      optionalColumns.forEach((colName) => {
+        const index = normalizedHeaders.indexOf(colName.toLowerCase())
+        if (index >= 0) {
+          columnIndices[colName] = index
+        }
       })
 
       // Process CSV rows (skip header row)
@@ -178,6 +186,14 @@ export async function POST(request: NextRequest) {
         requiredColumns.forEach((colName) => {
           const colIndex = columnIndices[colName]
           rowData[colName] = (row[colIndex] || '').trim()
+        })
+        
+        // Add optional columns if they exist
+        optionalColumns.forEach((colName) => {
+          if (columnIndices[colName] !== undefined) {
+            const colIndex = columnIndices[colName]
+            rowData[colName] = (row[colIndex] || '').trim()
+          }
         })
 
         // Basic validation - skip completely empty rows
@@ -343,12 +359,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Validate columns
-      if (headers.length !== requiredColumns.length) {
+      // Validate columns - accept 7-8 columns (7 required + 1 optional RC Description)
+      if (headers.length < requiredColumns.length || headers.length > requiredColumns.length + optionalColumns.length) {
         return NextResponse.json(
           {
             success: false,
-            message: `Invalid column count. Expected ${requiredColumns.length} columns, got ${headers.length}. Required columns: ${requiredColumns.join(', ')}`,
+            message: `Invalid column count. Expected ${requiredColumns.length}-${requiredColumns.length + optionalColumns.length} columns (${requiredColumns.length} required + ${optionalColumns.length} optional), got ${headers.length}. Required columns: ${requiredColumns.join(', ')}${optionalColumns.length > 0 ? `. Optional: ${optionalColumns.join(', ')}` : ''}`,
           } as ApiResponse,
           { status: 400 }
         )
@@ -372,10 +388,18 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Find column indices
+      // Find column indices for required columns
       const columnIndices: Record<string, number> = {}
       requiredColumns.forEach((colName) => {
         columnIndices[colName] = normalizedHeaders.indexOf(colName.toLowerCase())
+      })
+      
+      // Find optional column indices
+      optionalColumns.forEach((colName) => {
+        const index = normalizedHeaders.indexOf(colName.toLowerCase())
+        if (index >= 0) {
+          columnIndices[colName] = index
+        }
       })
 
       // Collect data from rows (skip header row)
@@ -390,6 +414,16 @@ export async function POST(request: NextRequest) {
           const cell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: colIndex })]
           const cellValue = cell && cell.v ? String(cell.v).trim() : ''
           rowData[colName] = cellValue
+        })
+        
+        // Get cell values for optional columns if they exist
+        optionalColumns.forEach((colName) => {
+          if (columnIndices[colName] !== undefined) {
+            const colIndex = columnIndices[colName]
+            const cell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: colIndex })]
+            const cellValue = cell && cell.v ? String(cell.v).trim() : ''
+            rowData[colName] = cellValue
+          }
         })
 
         // Basic validation - skip completely empty rows

@@ -19,12 +19,12 @@ export default function AddSuccessRateCard() {
     'Tanggal Transaksi',
     'Jenis Transaksi',
     'RC',
-    'RC Description',
     'total transaksi',
     'Total Nominal',
     'Total Biaya Admin',
     'Status Transaksi',
   ]
+  const optionalColumns = ['RC Description']
 
   useEffect(() => {
     loadApplications()
@@ -139,11 +139,11 @@ export default function AddSuccessRateCard() {
 
             const headers = rows[0].map(h => h.trim())
 
-            // Check if there are exactly 8 columns
-            if (headers.length !== requiredColumns.length) {
+            // Check if there are 7-8 columns (7 required + 1 optional RC Description)
+            if (headers.length < requiredColumns.length || headers.length > requiredColumns.length + optionalColumns.length) {
               resolve({
                 isValid: false,
-                error: `Invalid column count. Expected ${requiredColumns.length} columns, got ${headers.length}. Required columns: ${requiredColumns.join(', ')}`,
+                error: `Invalid column count. Expected ${requiredColumns.length}-${requiredColumns.length + optionalColumns.length} columns (${requiredColumns.length} required + ${optionalColumns.length} optional), got ${headers.length}. Required columns: ${requiredColumns.join(', ')}${optionalColumns.length > 0 ? `. Optional: ${optionalColumns.join(', ')}` : ''}`,
               })
               return
             }
@@ -191,11 +191,11 @@ export default function AddSuccessRateCard() {
                 }
               }
 
-              // Check if there are exactly 8 columns
-              if (headers.length !== requiredColumns.length) {
+              // Check if there are 7-8 columns (7 required + 1 optional RC Description)
+              if (headers.length < requiredColumns.length || headers.length > requiredColumns.length + optionalColumns.length) {
                 resolve({
                   isValid: false,
-                  error: `Invalid column count. Expected ${requiredColumns.length} columns, got ${headers.length}. Required columns: ${requiredColumns.join(', ')}`,
+                  error: `Invalid column count. Expected ${requiredColumns.length}-${requiredColumns.length + optionalColumns.length} columns (${requiredColumns.length} required + ${optionalColumns.length} optional), got ${headers.length}. Required columns: ${requiredColumns.join(', ')}${optionalColumns.length > 0 ? `. Optional: ${optionalColumns.join(', ')}` : ''}`,
                 })
                 return
               }
@@ -259,7 +259,7 @@ export default function AddSuccessRateCard() {
     if (validationResult.isValid) {
       setSelectedFile(file)
       setMessage({
-        text: 'File valid! All 8 columns verified.',
+        text: 'File valid! Columns verified.',
         type: 'success',
       })
     } else {
@@ -406,6 +406,14 @@ export default function AddSuccessRateCard() {
               Drag & drop or click
             </p>
             <p className="text-xs text-gray-400">Excel or CSV file</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Required: {requiredColumns.join(', ')}
+            </p>
+            {optionalColumns.length > 0 && (
+              <p className="text-xs text-gray-400">
+                Optional: {optionalColumns.join(', ')}
+              </p>
+            )}
           </div>
         )}
         <input

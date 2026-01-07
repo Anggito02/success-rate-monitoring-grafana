@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
     const isCSV = file.name.toLowerCase().endsWith('.csv')
     let headers: string[] = []
     let successRateData: SuccessRateEntry[] = []
+    const skippedRows: Array<{ rowNumber: number; reason: string }> = []
 
     if (isCSV) {
       // Parse CSV file
@@ -180,7 +181,15 @@ export async function POST(request: NextRequest) {
       // Process CSV rows (skip header row)
       for (let rowNum = 1; rowNum < rows.length; rowNum++) {
         const row = rows[rowNum]
-        if (row.length < requiredColumns.length) continue
+        const actualRowNumber = rowNum + 1 // +1 karena rowNum dimulai dari 1 (skip header), tapi user melihat dari row 2
+        
+        if (row.length < requiredColumns.length) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: `Jumlah kolom kurang dari ${requiredColumns.length} kolom required (hanya ${row.length} kolom)`
+          })
+          continue
+        }
 
         const rowData: Record<string, string> = {}
         requiredColumns.forEach((colName) => {
@@ -205,6 +214,10 @@ export async function POST(request: NextRequest) {
         ].some((col) => rowData[col] && rowData[col] !== '')
 
         if (!hasData) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: 'Semua kolom penting kosong (Tanggal Transaksi, Jenis Transaksi, RC, Status Transaksi)'
+          })
           continue
         }
 
@@ -264,6 +277,10 @@ export async function POST(request: NextRequest) {
         }
 
         if (!tanggalTransaksi) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: `Tanggal Transaksi tidak valid atau kosong: "${dateStr || '(kosong)'}". Format yang diterima: DD/MM/YYYY atau YYYY-MM-DD`
+          })
           continue
         }
 
@@ -272,24 +289,64 @@ export async function POST(request: NextRequest) {
         let rcDescription = rowData['RC Description'] || null
 
         // Validate Status Transaksi
-        let statusTransaksi: 'sukses' | 'failed' | 'pending' | null = null
+        let statusTransaksi: 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled' | null = null
         const rawStatus = rowData['Status Transaksi']
         const normalizedStatus = rawStatus.toLowerCase()
-        if (normalizedStatus === 'sukses' || rawStatus === 'Success') {
+        const upperStatus = rawStatus.toUpperCase()
+        
+        // SUCCESS variations: sukses, Success, SUCCESS, SUKSES
+        if (
+          normalizedStatus === 'sukses' ||
+          normalizedStatus === 'success' ||
+          rawStatus === 'Success' ||
+          upperStatus === 'SUCCESS' ||
+          upperStatus === 'SUKSES'
+        ) {
           statusTransaksi = 'sukses'
         } else if (
+          // FAILED variations: failed, Failed, FAILED, Gagal, GAGAL, Failure, failure
           normalizedStatus === 'failed' ||
+          normalizedStatus === 'failure' ||
+          normalizedStatus === 'gagal' ||
           rawStatus === 'Failed' ||
           rawStatus === 'Gagal' ||
           rawStatus === 'Failure' ||
-          rawStatus === 'gagal'
+          upperStatus === 'FAILED' ||
+          upperStatus === 'GAGAL' ||
+          upperStatus === 'FAILURE'
         ) {
           statusTransaksi = 'failed'
-        } else if (normalizedStatus === 'pending' || rawStatus === 'Pending') {
+        } else if (
+          // PENDING variations: pending, Pending, PENDING
+          normalizedStatus === 'pending' ||
+          rawStatus === 'Pending' ||
+          upperStatus === 'PENDING'
+        ) {
           statusTransaksi = 'pending'
+        } else if (
+          // SUSPECT variations: suspect, Suspect, SUSPECT
+          normalizedStatus === 'suspect' ||
+          rawStatus === 'Suspect' ||
+          upperStatus === 'SUSPECT'
+        ) {
+          statusTransaksi = 'suspect'
+        } else if (
+          // CANCELLED variations: cancelled, Cancelled, CANCELLED, canceled, Canceled, CANCELED
+          normalizedStatus === 'cancelled' ||
+          normalizedStatus === 'canceled' ||
+          rawStatus === 'Cancelled' ||
+          rawStatus === 'Canceled' ||
+          upperStatus === 'CANCELLED' ||
+          upperStatus === 'CANCELED'
+        ) {
+          statusTransaksi = 'cancelled'
         }
 
         if (statusTransaksi === null) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: `Status Transaksi tidak valid: "${rawStatus || '(kosong)'}". Nilai yang diterima: sukses/Success/SUCCESS/SUKSES, failed/Failed/FAILED/Gagal/GAGAL/Failure, pending/Pending/PENDING, suspect/Suspect/SUSPECT, cancelled/Cancelled/CANCELLED/canceled/Canceled/CANCELED`
+          })
           continue
         }
 
@@ -323,7 +380,7 @@ export async function POST(request: NextRequest) {
           total_transaksi: totalTransaksi,
           total_nominal: totalNominal,
           total_biaya_admin: totalBiayaAdmin,
-          status_transaksi: statusTransaksi,
+          status_transaksi: statusTransaksi as 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled',
           error_type: null,
           id_app_identifier: applicationId,
         })
@@ -406,6 +463,7 @@ export async function POST(request: NextRequest) {
       successRateData = []
 
       for (let rowNum = 1; rowNum <= range.e.r; rowNum++) {
+        const actualRowNumber = rowNum + 1 // +1 karena rowNum dimulai dari 1 (skip header), tapi user melihat dari row 2
         const rowData: Record<string, string> = {}
 
         // Get cell values for each required column
@@ -435,6 +493,10 @@ export async function POST(request: NextRequest) {
         ].some((col) => rowData[col] && rowData[col] !== '')
 
         if (!hasData) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: 'Semua kolom penting kosong (Tanggal Transaksi, Jenis Transaksi, RC, Status Transaksi)'
+          })
           continue
         }
 
@@ -501,9 +563,18 @@ export async function POST(request: NextRequest) {
             bulan = String(localMonth)
             tahun = localYear
           } else {
-            console.warn(`Invalid date in row ${rowNum}:`, rawCell.v)
+            skippedRows.push({
+              rowNumber: actualRowNumber,
+              reason: `Tanggal Transaksi tidak valid: "${rawCell.v || '(kosong)'}". Format yang diterima: DD/MM/YYYY atau YYYY-MM-DD`
+            })
             continue
           }
+        } else {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: 'Tanggal Transaksi kosong atau tidak ditemukan'
+          })
+          continue
         }
 
         let jenisTransaksi = rowData['Jenis Transaksi'] || null
@@ -511,24 +582,64 @@ export async function POST(request: NextRequest) {
         let rcDescription = rowData['RC Description'] || null
 
         // Validate Status Transaksi
-        let statusTransaksi: 'sukses' | 'failed' | 'pending' | null = null
+        let statusTransaksi: 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled' | null = null
         const rawStatus = rowData['Status Transaksi']
         const normalizedStatus = rawStatus.toLowerCase()
-        if (normalizedStatus === 'sukses' || rawStatus === 'Success') {
+        const upperStatus = rawStatus.toUpperCase()
+        
+        // SUCCESS variations: sukses, Success, SUCCESS, SUKSES
+        if (
+          normalizedStatus === 'sukses' ||
+          normalizedStatus === 'success' ||
+          rawStatus === 'Success' ||
+          upperStatus === 'SUCCESS' ||
+          upperStatus === 'SUKSES'
+        ) {
           statusTransaksi = 'sukses'
         } else if (
+          // FAILED variations: failed, Failed, FAILED, Gagal, GAGAL, Failure, failure
           normalizedStatus === 'failed' ||
+          normalizedStatus === 'failure' ||
+          normalizedStatus === 'gagal' ||
           rawStatus === 'Failed' ||
           rawStatus === 'Gagal' ||
           rawStatus === 'Failure' ||
-          rawStatus === 'gagal'
+          upperStatus === 'FAILED' ||
+          upperStatus === 'GAGAL' ||
+          upperStatus === 'FAILURE'
         ) {
           statusTransaksi = 'failed'
-        } else if (normalizedStatus === 'pending' || rawStatus === 'Pending') {
+        } else if (
+          // PENDING variations: pending, Pending, PENDING
+          normalizedStatus === 'pending' ||
+          rawStatus === 'Pending' ||
+          upperStatus === 'PENDING'
+        ) {
           statusTransaksi = 'pending'
+        } else if (
+          // SUSPECT variations: suspect, Suspect, SUSPECT
+          normalizedStatus === 'suspect' ||
+          rawStatus === 'Suspect' ||
+          upperStatus === 'SUSPECT'
+        ) {
+          statusTransaksi = 'suspect'
+        } else if (
+          // CANCELLED variations: cancelled, Cancelled, CANCELLED, canceled, Canceled, CANCELED
+          normalizedStatus === 'cancelled' ||
+          normalizedStatus === 'canceled' ||
+          rawStatus === 'Cancelled' ||
+          rawStatus === 'Canceled' ||
+          upperStatus === 'CANCELLED' ||
+          upperStatus === 'CANCELED'
+        ) {
+          statusTransaksi = 'cancelled'
         }
 
         if (statusTransaksi === null) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: `Status Transaksi tidak valid: "${rawStatus || '(kosong)'}". Nilai yang diterima: sukses/Success/SUCCESS/SUKSES, failed/Failed/FAILED/Gagal/GAGAL/Failure, pending/Pending/PENDING, suspect/Suspect/SUSPECT, cancelled/Cancelled/CANCELLED/canceled/Canceled/CANCELED`
+          })
           continue
         }
 
@@ -562,11 +673,27 @@ export async function POST(request: NextRequest) {
           total_transaksi: totalTransaksi,
           total_nominal: totalNominal,
           total_biaya_admin: totalBiayaAdmin,
-          status_transaksi: statusTransaksi,
+          status_transaksi: statusTransaksi as 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled',
           error_type: null,
           id_app_identifier: applicationId,
         })
       }
+    }
+
+    // Check if there are skipped rows - fail upload if any rows were skipped
+    if (skippedRows.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Upload gagal: ${skippedRows.length} row(s) memiliki error dan di-skip`,
+          data: {
+            skippedRows: skippedRows,
+            totalSkipped: skippedRows.length,
+            totalProcessed: successRateData.length,
+          },
+        } as ApiResponse & { data: { skippedRows: Array<{ rowNumber: number; reason: string }>; totalSkipped: number; totalProcessed: number } },
+        { status: 400 }
+      )
     }
 
     if (successRateData.length === 0) {
@@ -637,10 +764,90 @@ export async function POST(request: NextRequest) {
         // Apply new business logic if error_type is still null
         if (entry.error_type === null) {
           if (entry.status_transaksi === 'sukses') {
-            // Rule 1: If status is sukses and error_type is null → Sukses
-            entry.error_type = 'Sukses'
+            // Rule 1: If status is sukses and error_type is null
+            if (!entry.rc || entry.rc === '' || entry.rc === null) {
+              entry.error_type = 'Sukses'
+            } else {
+              await connection.execute(
+                `INSERT IGNORE INTO unmapped_rc 
+                 (id_app_identifier, jenis_transaksi, rc, rc_description, status_transaksi, error_type)
+                 VALUES (?, ?, ?, ?, ?, NULL)`,
+                [
+                  applicationId,
+                  entry.jenis_transaksi,
+                  entry.rc,
+                  entry.rc_description,
+                  entry.status_transaksi
+                ]
+              )
+              // Set error_type to Sukses for now
+              entry.error_type = 'Sukses'
+            }
+          } else if (entry.status_transaksi === 'pending') {
+            // Rule 2: If status is pending and error_type is null → Default to 'S'
+            entry.error_type = 'S'
+            
+            // If RC exists but not mapped → Insert into unmapped_rc
+            if (entry.rc && entry.rc !== '' && entry.rc !== null) {
+              // Use INSERT IGNORE to avoid duplicates
+              await connection.execute(
+                `INSERT IGNORE INTO unmapped_rc 
+                 (id_app_identifier, jenis_transaksi, rc, rc_description, status_transaksi, error_type)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                  applicationId,
+                  entry.jenis_transaksi,
+                  entry.rc,
+                  entry.rc_description,
+                  entry.status_transaksi,
+                  'S' // Store 'S' as initial error_type for pending
+                ]
+              )
+            }
+          } else if (entry.status_transaksi === 'suspect') {
+            // Rule 3: If status is suspect and error_type is null → Default to 'S'
+            entry.error_type = 'S'
+            
+            // If RC exists but not mapped → Insert into unmapped_rc
+            if (entry.rc && entry.rc !== '' && entry.rc !== null) {
+              // Use INSERT IGNORE to avoid duplicates
+              await connection.execute(
+                `INSERT IGNORE INTO unmapped_rc 
+                 (id_app_identifier, jenis_transaksi, rc, rc_description, status_transaksi, error_type)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                  applicationId,
+                  entry.jenis_transaksi,
+                  entry.rc,
+                  entry.rc_description,
+                  entry.status_transaksi,
+                  'S' // Store 'S' as initial error_type for suspect
+                ]
+              )
+            }
+          } else if (entry.status_transaksi === 'cancelled') {
+            // Rule 4: If status is cancelled and error_type is null → Default to 'S'
+            entry.error_type = 'S'
+            
+            // If RC exists but not mapped → Insert into unmapped_rc
+            if (entry.rc && entry.rc !== '' && entry.rc !== null) {
+              // Use INSERT IGNORE to avoid duplicates
+              await connection.execute(
+                `INSERT IGNORE INTO unmapped_rc 
+                 (id_app_identifier, jenis_transaksi, rc, rc_description, status_transaksi, error_type)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                  applicationId,
+                  entry.jenis_transaksi,
+                  entry.rc,
+                  entry.rc_description,
+                  entry.status_transaksi,
+                  'S' // Store 'S' as initial error_type for cancelled
+                ]
+              )
+            }
           } else if (entry.status_transaksi === 'failed') {
-            // Rule 2: If status is failed and error_type is null
+            // Rule 3: If status is failed and error_type is null
             if (!entry.rc || entry.rc === '' || entry.rc === null) {
               // If RC is null/empty → S
               entry.error_type = 'S'

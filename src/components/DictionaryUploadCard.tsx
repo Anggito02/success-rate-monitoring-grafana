@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { Application } from '@/types'
+import ErrorPopup from './ErrorPopup'
+
+interface SkippedRow {
+  rowNumber: number
+  reason: string
+}
 
 export default function DictionaryUploadCard() {
   const [applications, setApplications] = useState<Application[]>([])
@@ -13,6 +19,10 @@ export default function DictionaryUploadCard() {
     text: string
     type: 'success' | 'error' | 'info'
   } | null>(null)
+  const [showErrorPopup, setShowErrorPopup] = useState(false)
+  const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([])
+  const [totalSkipped, setTotalSkipped] = useState(0)
+  const [totalProcessed, setTotalProcessed] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const requiredColumns = ['Jenis Transaksi', 'RC', 'S/N']
@@ -290,6 +300,7 @@ export default function DictionaryUploadCard() {
       const result = await response.json()
 
       if (result.success) {
+        setIsLoading(false)
         setMessage({ text: result.message, type: 'success' })
         // Dispatch event to notify other components
         window.dispatchEvent(new CustomEvent('dictionaryUploaded'))
@@ -300,11 +311,20 @@ export default function DictionaryUploadCard() {
           fileInputRef.current.value = ''
         }
       } else {
-        throw new Error(result.message || 'Upload failed')
+        // Check if response contains skipped rows data
+        if (result.data && result.data.skippedRows) {
+          setIsLoading(false) // Stop loading immediately when error occurs
+          setSkippedRows(result.data.skippedRows)
+          setTotalSkipped(result.data.totalSkipped || 0)
+          setTotalProcessed(result.data.totalProcessed || 0)
+          setShowErrorPopup(true)
+        } else {
+          setMessage({ text: result.message || 'Upload failed', type: 'error' })
+          setIsLoading(false)
+        }
       }
     } catch (error: any) {
       setMessage({ text: `Upload failed: ${error.message}`, type: 'error' })
-    } finally {
       setIsLoading(false)
     }
   }
@@ -455,6 +475,14 @@ export default function DictionaryUploadCard() {
       <script
         src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
         async
+      />
+
+      <ErrorPopup
+        isOpen={showErrorPopup}
+        onClose={() => setShowErrorPopup(false)}
+        skippedRows={skippedRows}
+        totalSkipped={totalSkipped}
+        totalProcessed={totalProcessed}
       />
     </div>
   )

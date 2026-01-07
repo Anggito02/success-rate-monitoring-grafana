@@ -27,7 +27,7 @@ export interface SuccessRateEntry {
   total_transaksi: number | null
   total_nominal: number | null
   total_biaya_admin: number | null
-  status_transaksi: 'sukses' | 'failed' | 'pending'
+  status_transaksi: 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled'
   error_type: 'S' | 'N' | 'Sukses' | null
   id_app_identifier: number
 }
@@ -39,7 +39,7 @@ export interface UnmappedRC {
   jenis_transaksi: string | null
   rc: string | null
   rc_description: string | null
-  status_transaksi: 'sukses' | 'failed' | 'pending' | null
+  status_transaksi: 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled' | null
   error_type: 'S' | 'N' | 'Sukses' | null
   created_at?: Date
 }

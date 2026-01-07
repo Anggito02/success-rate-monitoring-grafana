@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
       rc_description: string | null
       error_type: 'S' | 'N' | 'Sukses'
     }> = []
+    const skippedRows: Array<{ rowNumber: number; reason: string }> = []
 
     if (isCSV) {
       // Parse CSV file
@@ -168,7 +169,15 @@ export async function POST(request: NextRequest) {
       // Process CSV rows (skip header row)
       for (let rowNum = 1; rowNum < rows.length; rowNum++) {
         const row = rows[rowNum]
-        if (row.length < 3) continue
+        const actualRowNumber = rowNum + 1 // +1 karena rowNum dimulai dari 1 (skip header), tapi user melihat dari row 2
+        
+        if (row.length < 3) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: `Jumlah kolom kurang dari 3 kolom required (hanya ${row.length} kolom)`
+          })
+          continue
+        }
 
         const jenisTransaksi = (row[jenisTransaksiIndex] || '').trim()
         const rc = (row[rcIndex] || '').trim()
@@ -193,6 +202,10 @@ export async function POST(request: NextRequest) {
 
         // Validate row data - skip if missing error_type
         if (!errorType) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: `Kolom S/N tidak valid: "${rawSn || '(kosong)'}". Nilai yang diterima: S, N, Sukses/Success/Berhasil`
+          })
           continue
         }
 
@@ -276,6 +289,8 @@ export async function POST(request: NextRequest) {
       dictionaryData = []
 
       for (let rowNum = 1; rowNum <= range.e.r; rowNum++) {
+        const actualRowNumber = rowNum + 1 // +1 karena rowNum dimulai dari 1 (skip header), tapi user melihat dari row 2
+        
         const jenisTransaksiCell =
           worksheet[XLSX.utils.encode_cell({ r: rowNum, c: jenisTransaksiIndex })]
         const rcCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcIndex })]
@@ -311,6 +326,10 @@ export async function POST(request: NextRequest) {
 
         // Validate row data - skip if missing error_type
         if (!errorType) {
+          skippedRows.push({
+            rowNumber: actualRowNumber,
+            reason: `Kolom S/N tidak valid: "${rawSn || '(kosong)'}". Nilai yang diterima: S, N, Sukses/Success/Berhasil`
+          })
           continue
         }
 
@@ -321,6 +340,22 @@ export async function POST(request: NextRequest) {
           error_type: errorType,
         })
       }
+    }
+
+    // Check if there are skipped rows - fail upload if any rows were skipped
+    if (skippedRows.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Upload gagal: ${skippedRows.length} row(s) memiliki error dan di-skip`,
+          data: {
+            skippedRows: skippedRows,
+            totalSkipped: skippedRows.length,
+            totalProcessed: dictionaryData.length,
+          },
+        } as ApiResponse & { data: { skippedRows: Array<{ rowNumber: number; reason: string }>; totalSkipped: number; totalProcessed: number } },
+        { status: 400 }
+      )
     }
 
     if (dictionaryData.length === 0) {

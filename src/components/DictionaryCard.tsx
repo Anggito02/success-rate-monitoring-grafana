@@ -358,8 +358,8 @@ export default function DictionaryCard() {
     // Convert to CSV format
     const csvContent = [
       headers.join(','),
-      ...rows.map((row) =>
-        row.map((cell) => {
+      ...rows.map((row: any) =>
+        row.map((cell: any) => {
           // Escape commas and quotes, wrap in quotes if needed
           const cellStr = String(cell).replace(/"/g, '""')
           if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {

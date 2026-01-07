@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { Application } from '@/types'
+import ErrorPopup from './ErrorPopup'
+
+interface SkippedRow {
+  rowNumber: number
+  reason: string
+}
 
 export default function AddSuccessRateCard() {
   const [applications, setApplications] = useState<Application[]>([])
@@ -13,6 +19,10 @@ export default function AddSuccessRateCard() {
     text: string
     type: 'success' | 'error' | 'info'
   } | null>(null)
+  const [showErrorPopup, setShowErrorPopup] = useState(false)
+  const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([])
+  const [totalSkipped, setTotalSkipped] = useState(0)
+  const [totalProcessed, setTotalProcessed] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const requiredColumns = [
@@ -327,13 +337,29 @@ export default function AddSuccessRateCard() {
       const result = await response.json()
 
       if (result.success) {
+        setIsLoading(false)
         setMessage({ text: result.message, type: 'success' })
+        // Reset form on success
+        setSelectedFile(null)
+        setSelectedAppId('')
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
       } else {
-        throw new Error(result.message || 'Upload failed')
+        // Check if response contains skipped rows data
+        if (result.data && result.data.skippedRows) {
+          setIsLoading(false) // Stop loading immediately when error occurs
+          setSkippedRows(result.data.skippedRows)
+          setTotalSkipped(result.data.totalSkipped || 0)
+          setTotalProcessed(result.data.totalProcessed || 0)
+          setShowErrorPopup(true)
+        } else {
+          setMessage({ text: result.message || 'Upload failed', type: 'error' })
+          setIsLoading(false)
+        }
       }
     } catch (error: any) {
       setMessage({ text: `Upload failed: ${error.message}`, type: 'error' })
-    } finally {
       setIsLoading(false)
     }
   }
@@ -482,6 +508,14 @@ export default function AddSuccessRateCard() {
         </span>
         <div className="absolute inset-0 bg-white/20 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300" />
       </button>
+
+      <ErrorPopup
+        isOpen={showErrorPopup}
+        onClose={() => setShowErrorPopup(false)}
+        skippedRows={skippedRows}
+        totalSkipped={totalSkipped}
+        totalProcessed={totalProcessed}
+      />
     </div>
   )
 }

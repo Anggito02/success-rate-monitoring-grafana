@@ -67,6 +67,11 @@ export async function POST(request: NextRequest) {
           )
 
           // 2. Update all app_success_rate entries that match this RC
+          // This includes:
+          // - Entries with error_type IS NULL (failed status)
+          // - Entries with status_transaksi = 'pending' AND error_type = 'S' (pending status that was defaulted to 'S')
+          // - Entries with status_transaksi = 'suspect' AND error_type = 'S' (suspect status that was defaulted to 'S')
+          // - Entries with status_transaksi = 'cancelled' AND error_type = 'S' (cancelled status that was defaulted to 'S')
           let updateQuery: string
           let updateParams: any[]
           
@@ -76,14 +81,14 @@ export async function POST(request: NextRequest) {
              WHERE id_app_identifier = ? 
              AND rc = ? 
              AND jenis_transaksi = ?
-             AND error_type IS NULL`
+             AND (error_type IS NULL OR (status_transaksi = 'pending' AND error_type = 'S') OR (status_transaksi = 'suspect' AND error_type = 'S') OR (status_transaksi = 'cancelled' AND error_type = 'S'))`
             updateParams = [error_type, id_app_identifier, rc, jenis_transaksi]
           } else {
             updateQuery = `UPDATE app_success_rate 
              SET error_type = ?
              WHERE id_app_identifier = ? 
              AND rc = ?
-             AND error_type IS NULL`
+             AND (error_type IS NULL OR (status_transaksi = 'pending' AND error_type = 'S') OR (status_transaksi = 'suspect' AND error_type = 'S') OR (status_transaksi = 'cancelled' AND error_type = 'S'))`
             updateParams = [error_type, id_app_identifier, rc]
           }
           

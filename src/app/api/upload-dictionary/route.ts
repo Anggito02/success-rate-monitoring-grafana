@@ -110,65 +110,65 @@ export async function POST(request: NextRequest) {
     }> = []
     const skippedRows: Array<{ rowNumber: number; reason: string }> = []
 
-    if (isCSV) {
-      // Parse CSV file
-      const text = await file.text()
-      const rows = parseCSV(text)
+      if (isCSV) {
+        // Parse CSV file
+        const text = await file.text()
+        const rows = parseCSV(text)
 
-      if (rows.length === 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'CSV file is empty',
-          } as ApiResponse,
-          { status: 400 }
-        )
-      }
+        if (rows.length === 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: 'CSV file is empty',
+            } as ApiResponse,
+            { status: 400 }
+          )
+        }
 
-      // Get headers from first row
-      const headers = rows[0].map(h => h.trim())
+        // Get headers from first row
+        const headers = rows[0].map(h => h.trim())
 
       // Validate columns - now expect 4 columns (with RC Description)
-      if (headers.length < 3 || headers.length > 4) {
-        return NextResponse.json(
-          {
-            success: false,
+        if (headers.length < 3 || headers.length > 4) {
+          return NextResponse.json(
+            {
+              success: false,
             message: `Invalid column count. Expected 3-4 columns (Jenis Transaksi, RC, S/N, [RC Description]), got ${headers.length}`,
-          } as ApiResponse,
-          { status: 400 }
-        )
-      }
+            } as ApiResponse,
+            { status: 400 }
+          )
+        }
 
-      // Check required columns (case-insensitive)
-      const normalizedHeaders = headers.map((h) => h.toLowerCase())
+        // Check required columns (case-insensitive)
+        const normalizedHeaders = headers.map((h) => h.toLowerCase())
       const requiredColumns = ['jenis transaksi', 'rc', 's/n']
       const optionalColumns = ['rc description']
 
-      const missingColumns = requiredColumns.filter(
-        (required) => !normalizedHeaders.includes(required)
-      )
-
-      if (missingColumns.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Missing required columns: ${missingColumns.join(', ')}`,
-          } as ApiResponse,
-          { status: 400 }
+        const missingColumns = requiredColumns.filter(
+          (required) => !normalizedHeaders.includes(required)
         )
-      }
 
-      // Find column indices
-      const jenisTransaksiIndex = normalizedHeaders.indexOf('jenis transaksi')
-      const rcIndex = normalizedHeaders.indexOf('rc')
+        if (missingColumns.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Missing required columns: ${missingColumns.join(', ')}`,
+            } as ApiResponse,
+            { status: 400 }
+          )
+        }
+
+        // Find column indices
+        const jenisTransaksiIndex = normalizedHeaders.indexOf('jenis transaksi')
+        const rcIndex = normalizedHeaders.indexOf('rc')
       const snIndex = normalizedHeaders.indexOf('s/n')
       const rcDescriptionIndex = normalizedHeaders.includes('rc description') 
         ? normalizedHeaders.indexOf('rc description') 
         : -1
 
-      // Process CSV rows (skip header row)
-      for (let rowNum = 1; rowNum < rows.length; rowNum++) {
-        const row = rows[rowNum]
+        // Process CSV rows (skip header row)
+        for (let rowNum = 1; rowNum < rows.length; rowNum++) {
+          const row = rows[rowNum]
         const actualRowNumber = rowNum + 1 // +1 karena rowNum dimulai dari 1 (skip header), tapi user melihat dari row 2
         
         if (row.length < 3) {
@@ -179,168 +179,168 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        const jenisTransaksi = (row[jenisTransaksiIndex] || '').trim()
-        const rc = (row[rcIndex] || '').trim()
+          const jenisTransaksi = (row[jenisTransaksiIndex] || '').trim()
+          const rc = (row[rcIndex] || '').trim()
         const rawSn = (row[snIndex] || '').trim().toUpperCase()
         const rcDescription = rcDescriptionIndex >= 0 && row[rcDescriptionIndex] 
           ? (row[rcDescriptionIndex] || '').trim() 
           : null
 
         // Map S/N values to error_type
-        let errorType: 'S' | 'N' | 'Sukses' | null = null
+          let errorType: 'S' | 'N' | 'Sukses' | null = null
         if (rawSn === 'S') {
-          errorType = 'S'
+            errorType = 'S'
         } else if (rawSn === 'N') {
-          errorType = 'N'
-        } else if (
+            errorType = 'N'
+          } else if (
           rawSn === 'SUKSES' ||
           rawSn === 'SUCCESS' ||
           rawSn === 'BERHASIL'
-        ) {
-          errorType = 'Sukses'
-        }
+          ) {
+            errorType = 'Sukses'
+          }
 
         // Validate row data - skip if missing error_type
-        if (!errorType) {
+          if (!errorType) {
           skippedRows.push({
             rowNumber: actualRowNumber,
             reason: `Kolom S/N tidak valid: "${rawSn || '(kosong)'}". Nilai yang diterima: S, N, Sukses/Success/Berhasil`
           })
-          continue
-        }
+            continue
+          }
 
-        dictionaryData.push({
-          jenis_transaksi: jenisTransaksi,
-          rc: rc,
+          dictionaryData.push({
+            jenis_transaksi: jenisTransaksi,
+            rc: rc,
           rc_description: rcDescription || null,
-          error_type: errorType,
-        })
-      }
-    } else {
-      // Parse Excel file
-      const bytes = await file.arrayBuffer()
-      const buffer = Buffer.from(bytes)
-      const workbook = XLSX.read(buffer, { type: 'buffer' })
-
-      if (workbook.SheetNames.length === 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'Excel file contains no worksheets',
-          } as ApiResponse,
-          { status: 400 }
-        )
-      }
-
-      const firstSheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[firstSheetName]
-
-      // Get headers from first row
-      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
-      const headers: string[] = []
-
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
-        const cell = worksheet[cellAddress]
-        if (cell && cell.v) {
-          headers.push(String(cell.v).trim())
+            error_type: errorType,
+          })
         }
-      }
+      } else {
+        // Parse Excel file
+        const bytes = await file.arrayBuffer()
+        const buffer = Buffer.from(bytes)
+        const workbook = XLSX.read(buffer, { type: 'buffer' })
+
+        if (workbook.SheetNames.length === 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: 'Excel file contains no worksheets',
+            } as ApiResponse,
+            { status: 400 }
+          )
+        }
+
+        const firstSheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[firstSheetName]
+
+        // Get headers from first row
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
+        const headers: string[] = []
+
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
+          const cell = worksheet[cellAddress]
+          if (cell && cell.v) {
+            headers.push(String(cell.v).trim())
+          }
+        }
 
       // Validate columns - now expect 3-4 columns (with optional RC Description)
-      if (headers.length < 3 || headers.length > 4) {
-        return NextResponse.json(
-          {
-            success: false,
+        if (headers.length < 3 || headers.length > 4) {
+          return NextResponse.json(
+            {
+              success: false,
             message: `Invalid column count. Expected 3-4 columns (Jenis Transaksi, RC, S/N, [RC Description]), got ${headers.length}`,
-          } as ApiResponse,
-          { status: 400 }
-        )
-      }
+            } as ApiResponse,
+            { status: 400 }
+          )
+        }
 
-      // Check required columns (case-insensitive)
-      const normalizedHeaders = headers.map((h) => h.toLowerCase())
+        // Check required columns (case-insensitive)
+        const normalizedHeaders = headers.map((h) => h.toLowerCase())
       const requiredColumns = ['jenis transaksi', 'rc', 's/n']
       const optionalColumns = ['rc description']
 
-      const missingColumns = requiredColumns.filter(
-        (required) => !normalizedHeaders.includes(required)
-      )
-
-      if (missingColumns.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Missing required columns: ${missingColumns.join(', ')}`,
-          } as ApiResponse,
-          { status: 400 }
+        const missingColumns = requiredColumns.filter(
+          (required) => !normalizedHeaders.includes(required)
         )
-      }
 
-      // Find column indices
-      const jenisTransaksiIndex = normalizedHeaders.indexOf('jenis transaksi')
-      const rcIndex = normalizedHeaders.indexOf('rc')
+        if (missingColumns.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Missing required columns: ${missingColumns.join(', ')}`,
+            } as ApiResponse,
+            { status: 400 }
+          )
+        }
+
+        // Find column indices
+        const jenisTransaksiIndex = normalizedHeaders.indexOf('jenis transaksi')
+        const rcIndex = normalizedHeaders.indexOf('rc')
       const snIndex = normalizedHeaders.indexOf('s/n')
       const rcDescriptionIndex = normalizedHeaders.includes('rc description') 
         ? normalizedHeaders.indexOf('rc description') 
         : -1
 
-      // Collect data from rows (skip header row)
-      dictionaryData = []
+        // Collect data from rows (skip header row)
+        dictionaryData = []
 
-      for (let rowNum = 1; rowNum <= range.e.r; rowNum++) {
+        for (let rowNum = 1; rowNum <= range.e.r; rowNum++) {
         const actualRowNumber = rowNum + 1 // +1 karena rowNum dimulai dari 1 (skip header), tapi user melihat dari row 2
         
-        const jenisTransaksiCell =
-          worksheet[XLSX.utils.encode_cell({ r: rowNum, c: jenisTransaksiIndex })]
-        const rcCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcIndex })]
+          const jenisTransaksiCell =
+            worksheet[XLSX.utils.encode_cell({ r: rowNum, c: jenisTransaksiIndex })]
+          const rcCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcIndex })]
         const snCell = worksheet[XLSX.utils.encode_cell({ r: rowNum, c: snIndex })]
-        const rcDescriptionCell = rcDescriptionIndex >= 0
-          ? worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcDescriptionIndex })]
-          : null
+          const rcDescriptionCell = rcDescriptionIndex >= 0 
+            ? worksheet[XLSX.utils.encode_cell({ r: rowNum, c: rcDescriptionIndex })]
+            : null
 
-        const jenisTransaksi =
-          jenisTransaksiCell && jenisTransaksiCell.v
-            ? String(jenisTransaksiCell.v).trim()
-            : ''
-        const rc = rcCell && rcCell.v ? String(rcCell.v).trim() : ''
+          const jenisTransaksi =
+            jenisTransaksiCell && jenisTransaksiCell.v
+              ? String(jenisTransaksiCell.v).trim()
+              : ''
+          const rc = rcCell && rcCell.v ? String(rcCell.v).trim() : ''
         const rawSn =
           snCell && snCell.v ? String(snCell.v).trim().toUpperCase() : ''
-        const rcDescription = rcDescriptionCell && rcDescriptionCell.v
-          ? String(rcDescriptionCell.v).trim()
-          : null
+          const rcDescription = rcDescriptionCell && rcDescriptionCell.v
+            ? String(rcDescriptionCell.v).trim()
+            : null
 
         // Map S/N values to error_type
-        let errorType: 'S' | 'N' | 'Sukses' | null = null
+          let errorType: 'S' | 'N' | 'Sukses' | null = null
         if (rawSn === 'S') {
-          errorType = 'S'
+            errorType = 'S'
         } else if (rawSn === 'N') {
-          errorType = 'N'
-        } else if (
+            errorType = 'N'
+          } else if (
           rawSn === 'SUKSES' ||
           rawSn === 'SUCCESS' ||
           rawSn === 'BERHASIL'
-        ) {
-          errorType = 'Sukses'
-        }
+          ) {
+            errorType = 'Sukses'
+          }
 
         // Validate row data - skip if missing error_type
-        if (!errorType) {
+          if (!errorType) {
           skippedRows.push({
             rowNumber: actualRowNumber,
             reason: `Kolom S/N tidak valid: "${rawSn || '(kosong)'}". Nilai yang diterima: S, N, Sukses/Success/Berhasil`
           })
-          continue
-        }
+            continue
+          }
 
-        dictionaryData.push({
-          jenis_transaksi: jenisTransaksi,
-          rc: rc,
+          dictionaryData.push({
+            jenis_transaksi: jenisTransaksi,
+            rc: rc,
           rc_description: rcDescription || null,
-          error_type: errorType,
-        })
+            error_type: errorType,
+          })
+        }
       }
-    }
 
     // Check if there are skipped rows - fail upload if any rows were skipped
     if (skippedRows.length > 0) {
@@ -399,13 +399,13 @@ export async function POST(request: NextRequest) {
       `
 
       for (const entry of dictionaryData) {
-        await connection.execute(insertQuery, [
-          applicationId,
-          entry.jenis_transaksi,
-          entry.rc,
+          await connection.execute(insertQuery, [
+            applicationId,
+            entry.jenis_transaksi,
+            entry.rc,
           entry.rc_description,
-          entry.error_type,
-        ])
+            entry.error_type,
+          ])
       }
 
       return NextResponse.json({
@@ -418,17 +418,17 @@ export async function POST(request: NextRequest) {
         },
       } as ApiResponse)
     } finally {
-      connection.release()
+        connection.release()
     }
   } catch (error: any) {
     console.error('Error uploading dictionary:', error)
-    return NextResponse.json(
-      {
-        success: false,
+      return NextResponse.json(
+        {
+          success: false,
         message: 'Error processing dictionary file: ' + error.message,
-      } as ApiResponse,
-      { status: 500 }
-    )
+        } as ApiResponse,
+        { status: 500 }
+      )
   }
 }
 

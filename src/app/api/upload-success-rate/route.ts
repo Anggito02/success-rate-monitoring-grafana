@@ -781,7 +781,7 @@ export async function POST(request: NextRequest) {
                 ]
               )
               // Set error_type to Sukses for now
-              entry.error_type = 'Sukses'
+            entry.error_type = 'Sukses'
             }
           } else if (entry.status_transaksi === 'pending') {
             // Rule 2: If status is pending and error_type is null → Default to 'S'

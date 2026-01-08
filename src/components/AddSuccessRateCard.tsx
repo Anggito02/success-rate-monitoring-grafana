@@ -349,6 +349,7 @@ export default function AddSuccessRateCard() {
         // Check if response contains skipped rows data
         if (result.data && result.data.skippedRows) {
           setIsLoading(false) // Stop loading immediately when error occurs
+          setMessage(null) // Clear loading message
           setSkippedRows(result.data.skippedRows)
           setTotalSkipped(result.data.totalSkipped || 0)
           setTotalProcessed(result.data.totalProcessed || 0)
@@ -511,7 +512,10 @@ export default function AddSuccessRateCard() {
 
       <ErrorPopup
         isOpen={showErrorPopup}
-        onClose={() => setShowErrorPopup(false)}
+        onClose={() => {
+          setShowErrorPopup(false)
+          setMessage(null) // Clear any remaining loading message when popup is closed
+        }}
         skippedRows={skippedRows}
         totalSkipped={totalSkipped}
         totalProcessed={totalProcessed}

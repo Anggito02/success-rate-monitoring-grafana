@@ -40,6 +40,16 @@ export default function AddSuccessRateCard() {
     loadApplications()
   }, [])
 
+  // Auto-hide success message after 8 seconds
+  useEffect(() => {
+    if (message && message.type === 'success') {
+      const timer = setTimeout(() => {
+        setMessage(null)
+      }, 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
+
   const loadApplications = async () => {
     try {
       const response = await fetch('/api/applications')
@@ -339,6 +349,8 @@ export default function AddSuccessRateCard() {
       if (result.success) {
         setIsLoading(false)
         setMessage({ text: result.message, type: 'success' })
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('successRateUploaded'))
         // Reset form on success
         setSelectedFile(null)
         setSelectedAppId('')

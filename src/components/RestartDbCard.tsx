@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function RestartDbCard() {
   const [isLoading, setIsLoading] = useState(false)
@@ -8,6 +8,16 @@ export default function RestartDbCard() {
     text: string
     type: 'success' | 'error'
   } | null>(null)
+
+  // Auto-hide success message after 8 seconds
+  useEffect(() => {
+    if (message && message.type === 'success') {
+      const timer = setTimeout(() => {
+        setMessage(null)
+      }, 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
 
   const handleRestart = async () => {
     const confirmed = window.confirm(

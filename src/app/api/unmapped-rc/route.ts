@@ -1,13 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import type { ApiResponse, UnmappedRC } from '@/types'
 
 // GET - List all unmapped RCs
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const appId = searchParams.get('appId')
+
     const connection = await pool.getConnection()
     try {
-      const [rows]: any = await connection.execute(`
+      let query = `
         SELECT 
           u.id,
           u.id_app_identifier,
@@ -20,8 +23,17 @@ export async function GET() {
           u.created_at
         FROM unmapped_rc u
         LEFT JOIN app_identifier a ON u.id_app_identifier = a.id
-        ORDER BY u.created_at DESC
-      `)
+      `
+      const queryParams: any[] = []
+
+      if (appId) {
+        query += ' WHERE u.id_app_identifier = ?'
+        queryParams.push(parseInt(appId))
+      }
+
+      query += ' ORDER BY u.created_at DESC'
+
+      const [rows]: any = await connection.execute(query, queryParams)
 
       return NextResponse.json({
         success: true,

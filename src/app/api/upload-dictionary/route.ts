@@ -408,11 +408,83 @@ export async function POST(request: NextRequest) {
           ])
       }
 
+      // After uploading dictionary, remap unmapped_rc entries that now have a match
+      // Get all unmapped_rc entries for this application
+      const [unmappedRcs]: any = await connection.execute(
+        `SELECT id, id_app_identifier, jenis_transaksi, rc, status_transaksi
+         FROM unmapped_rc
+         WHERE id_app_identifier = ?`,
+        [applicationId]
+      )
+
+      let remappedCount = 0
+      for (const unmappedRc of unmappedRcs) {
+        // Check if this RC now exists in the dictionary
+        let dictionaryMatch: any[] = []
+        
+        if (unmappedRc.jenis_transaksi && unmappedRc.jenis_transaksi !== '') {
+          // Try to find exact match with jenis_transaksi
+          const [exactMatch]: any = await connection.execute(
+            `SELECT error_type FROM response_code_dictionary 
+             WHERE id_app_identifier = ? AND jenis_transaksi = ? AND rc = ?`,
+            [applicationId, unmappedRc.jenis_transaksi, unmappedRc.rc]
+          )
+          dictionaryMatch = exactMatch
+        }
+        
+        // If no exact match, try to find by RC only
+        if (dictionaryMatch.length === 0) {
+          const [rcOnlyMatch]: any = await connection.execute(
+            `SELECT error_type FROM response_code_dictionary 
+             WHERE id_app_identifier = ? AND rc = ? LIMIT 1`,
+            [applicationId, unmappedRc.rc]
+          )
+          dictionaryMatch = rcOnlyMatch
+        }
+        
+        // If found in dictionary, update app_success_rate and remove from unmapped_rc
+        if (dictionaryMatch.length > 0) {
+          const error_type = dictionaryMatch[0].error_type
+          
+          // Update all app_success_rate entries that match this RC
+          let updateQuery: string
+          let updateParams: any[]
+          
+          if (unmappedRc.jenis_transaksi && unmappedRc.jenis_transaksi !== '') {
+            updateQuery = `UPDATE app_success_rate 
+             SET error_type = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id_app_identifier = ? 
+             AND rc = ? 
+             AND jenis_transaksi = ?
+             AND (error_type IS NULL OR (status_transaksi = 'pending' AND error_type = 'S') OR (status_transaksi = 'suspect' AND error_type = 'S') OR (status_transaksi = 'cancelled' AND error_type = 'S'))`
+            updateParams = [error_type, applicationId, unmappedRc.rc, unmappedRc.jenis_transaksi]
+          } else {
+            updateQuery = `UPDATE app_success_rate 
+             SET error_type = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id_app_identifier = ? 
+             AND rc = ?
+             AND (error_type IS NULL OR (status_transaksi = 'pending' AND error_type = 'S') OR (status_transaksi = 'suspect' AND error_type = 'S') OR (status_transaksi = 'cancelled' AND error_type = 'S'))`
+            updateParams = [error_type, applicationId, unmappedRc.rc]
+          }
+          
+          await connection.execute(updateQuery, updateParams)
+          
+          // Delete from unmapped_rc
+          await connection.execute(
+            `DELETE FROM unmapped_rc WHERE id = ?`,
+            [unmappedRc.id]
+          )
+          
+          remappedCount++
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        message: `Dictionary uploaded successfully. ${dictionaryData.length} entries processed.`,
+        message: `Dictionary uploaded successfully. ${dictionaryData.length} entries processed.${remappedCount > 0 ? ` ${remappedCount} unmapped RC(s) have been automatically remapped.` : ''}`,
         data: {
           entriesProcessed: dictionaryData.length,
+          remappedCount: remappedCount,
           applicationId: applicationId,
           applicationName: applicationName,
         },

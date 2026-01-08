@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import type { UnmappedRC } from '@/types'
+import { useState, useEffect, useCallback } from 'react'
+import type { UnmappedRC, Application } from '@/types'
 
 export default function UnmappedRcCard() {
   const [unmappedRcs, setUnmappedRcs] = useState<UnmappedRC[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
+  const [selectedAppId, setSelectedAppId] = useState<string>('')
   const [selectedErrorTypes, setSelectedErrorTypes] = useState<Record<number, 'S' | 'N' | 'Sukses'>>({})
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
@@ -13,12 +15,30 @@ export default function UnmappedRcCard() {
   const [submittingAll, setSubmittingAll] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
-  const loadUnmappedRcs = async () => {
+  const loadApplications = async () => {
+    try {
+      const response = await fetch('/api/applications')
+      const result = await response.json()
+
+      if (result.success) {
+        setApplications(result.data)
+      }
+    } catch (err: any) {
+      console.error('Error loading applications:', err)
+    }
+  }
+
+  const loadUnmappedRcs = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch('/api/unmapped-rc')
+      const params = new URLSearchParams()
+      if (selectedAppId) {
+        params.append('appId', selectedAppId)
+      }
+
+      const response = await fetch(`/api/unmapped-rc?${params.toString()}`)
       const result = await response.json()
 
       if (result.success) {
@@ -35,7 +55,11 @@ export default function UnmappedRcCard() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [selectedAppId])
+
+  useEffect(() => {
+    loadApplications()
+  }, [])
 
   useEffect(() => {
     loadUnmappedRcs()
@@ -46,13 +70,25 @@ export default function UnmappedRcCard() {
     }
 
     window.addEventListener('successRateUploaded', handleDataChange)
+    window.addEventListener('dictionaryUploaded', handleDataChange)
     window.addEventListener('appAdded', handleDataChange)
 
     return () => {
       window.removeEventListener('successRateUploaded', handleDataChange)
+      window.removeEventListener('dictionaryUploaded', handleDataChange)
       window.removeEventListener('appAdded', handleDataChange)
     }
-  }, [])
+  }, [loadUnmappedRcs])
+
+  // Auto-hide success message after 8 seconds
+  useEffect(() => {
+    if (message && message.type === 'success') {
+      const timer = setTimeout(() => {
+        setMessage(null)
+      }, 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
 
   const handleErrorTypeChange = (id: number, value: 'S' | 'N' | 'Sukses') => {
     setSelectedErrorTypes(prev => ({
@@ -202,7 +238,7 @@ export default function UnmappedRcCard() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-3 md:p-4 h-full flex flex-col transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl border border-white/20">
+    <div className="glass-card rounded-xl p-3 md:p-4 h-full flex flex-col border border-white/20">
       {/* Icon Header */}
       <div className="flex items-center gap-1.5 mb-1.5">
         <div className="w-8 h-8 rounded-md bg-gradient-to-br from-orange-600 to-orange-800 flex items-center justify-center shadow-md flex-shrink-0">
@@ -216,6 +252,22 @@ export default function UnmappedRcCard() {
           </h2>
           <p className="text-xs text-gray-500">RC belum dimapping</p>
         </div>
+      </div>
+
+      {/* Filter */}
+      <div className="mb-1.5">
+        <select
+          value={selectedAppId}
+          onChange={(e) => setSelectedAppId(e.target.value)}
+          className="w-full px-2.5 py-1.5 border-2 border-gray-200 rounded-md text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-200 transition-all bg-white/80 backdrop-blur-sm"
+        >
+          <option value="">All Applications</option>
+          {applications.map((app) => (
+            <option key={app.id} value={app.id}>
+              {app.app_name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {message && (

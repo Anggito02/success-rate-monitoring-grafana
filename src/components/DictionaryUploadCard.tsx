@@ -32,6 +32,16 @@ export default function DictionaryUploadCard() {
     loadApplications()
   }, [])
 
+  // Auto-hide success message after 8 seconds
+  useEffect(() => {
+    if (message && message.type === 'success') {
+      const timer = setTimeout(() => {
+        setMessage(null)
+      }, 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
+
   const loadApplications = async () => {
     try {
       const response = await fetch('/api/applications')

@@ -89,13 +89,25 @@ export default function NoRcTransactionCard() {
     }
 
     window.addEventListener('successRateUploaded', handleDataChange)
+    window.addEventListener('dictionaryUploaded', handleDataChange)
     window.addEventListener('appAdded', handleDataChange)
 
     return () => {
       window.removeEventListener('successRateUploaded', handleDataChange)
+      window.removeEventListener('dictionaryUploaded', handleDataChange)
       window.removeEventListener('appAdded', handleDataChange)
     }
   }, [currentPage, loadTransactions])
+
+  // Auto-hide success message after 8 seconds
+  useEffect(() => {
+    if (message && message.type === 'success') {
+      const timer = setTimeout(() => {
+        setMessage(null)
+      }, 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
 
   const handleSelectItem = (id: number) => {
     setSelectedItems(prev => {
@@ -241,7 +253,7 @@ export default function NoRcTransactionCard() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-3 md:p-4 h-full flex flex-col transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl border border-white/20">
+    <div className="glass-card rounded-xl p-3 md:p-4 h-full flex flex-col border border-white/20">
       {/* Header */}
       <div className="flex items-center gap-1.5 mb-2">
         <div className="w-8 h-8 rounded-md bg-gradient-to-br from-orange-600 to-orange-800 flex items-center justify-center shadow-md flex-shrink-0">
@@ -338,21 +350,35 @@ export default function NoRcTransactionCard() {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto mb-1.5 border border-gray-200/50 rounded-md bg-white/60 backdrop-blur-sm shadow-inner min-h-0" style={{ maxHeight: 'calc(100vh)' }}>
         {isLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <svg className="animate-spin h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+          <div className="p-2 text-center">
+            <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-orange-500 border-t-transparent mb-1"></div>
+            <p className="text-gray-500 text-xs">Loading...</p>
           </div>
         ) : error ? (
-          <div className="text-red-600 text-xs p-2">{error}</div>
+          <div className="p-2 text-center bg-gradient-to-r from-red-50 to-rose-50 rounded-md m-1.5 border border-red-200">
+            <svg className="w-4 h-4 text-red-500 mx-auto mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-red-600 text-xs font-semibold">Error: {error}</p>
+          </div>
         ) : transactions.length === 0 ? (
-          <div className="text-gray-500 text-xs p-2 text-center">No transactions without RC found</div>
+          <div className="p-3 text-center">
+            <svg className="w-6 h-6 text-green-500 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-gray-500 text-xs">No transactions without RC found</p>
+          </div>
         ) : (
-          <div className="space-y-1">
-            {transactions.map((transaction) => {
+          <>
+            <div className="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-800 text-white text-xs font-bold py-1 px-1.5 rounded-t-md backdrop-blur-sm z-10">
+              <div className="flex items-center justify-between">
+                <span>Total: {totalCount} Transaksi belum memiliki RC</span>
+              </div>
+            </div>
+            <div className="space-y-1 p-1">
+              {transactions.map((transaction) => {
               const id = transaction.id!
               const isSelected = selectedItems.has(id)
               const rcValue = editingRc[id] ?? ''
@@ -416,10 +442,23 @@ export default function NoRcTransactionCard() {
                   </div>
                 </div>
               )
-            })}
-          </div>
+              })}
+            </div>
+          </>
         )}
       </div>
+
+      {/* Refresh Button */}
+      <button
+        type="button"
+        onClick={() => loadTransactions(currentPage)}
+        className="w-full px-2.5 py-1.5 rounded-md font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-700 text-white hover:from-orange-600 hover:to-orange-800 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-1"
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Refresh
+      </button>
 
       {/* Pagination */}
       {!isLoading && !error && transactions.length > 0 && (

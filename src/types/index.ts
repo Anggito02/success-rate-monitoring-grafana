@@ -18,18 +18,21 @@ export interface DictionaryEntry {
 }
 
 export interface SuccessRateEntry {
-  tanggal_transaksi: string
-  bulan: string
-  tahun: number
-  jenis_transaksi: string | null
-  rc: string | null
-  rc_description: string | null
-  total_transaksi: number | null
-  total_nominal: number | null
-  total_biaya_admin: number | null
-  status_transaksi: 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled'
-  error_type: 'S' | 'N' | 'Sukses' | null
+  id?: number
+  tanggal_transaksi: string // WAJIB, tidak boleh null
+  bulan: string // WAJIB, tidak boleh null
+  tahun: number // WAJIB, tidak boleh null
+  jenis_transaksi: string // WAJIB, tidak boleh null
+  rc: string | null // BOLEH null
+  rc_description: string | null // BOLEH null
+  total_transaksi: number | null // BOLEH null
+  total_nominal: number | null // BOLEH null
+  total_biaya_admin: number | null // BOLEH null
+  status_transaksi: string | null // VARCHAR, boleh null atau value apapun
+  error_type: 'S' | 'N' | 'Sukses' | null // BOLEH null
   id_app_identifier: number
+  created_at?: Date
+  updated_at?: Date
 }
 
 export interface UnmappedRC {
@@ -39,7 +42,7 @@ export interface UnmappedRC {
   jenis_transaksi: string | null
   rc: string | null
   rc_description: string | null
-  status_transaksi: 'sukses' | 'failed' | 'pending' | 'suspect' | 'cancelled' | null
+  status_transaksi: string | null // VARCHAR, boleh null atau value apapun
   error_type: 'S' | 'N' | 'Sukses' | null
   created_at?: Date
 }

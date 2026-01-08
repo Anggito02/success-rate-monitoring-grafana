@@ -7,23 +7,39 @@ export async function POST() {
     const connection = await pool.getConnection()
 
     try {
-      // Update app_success_rate table ENUM
+      // Update app_success_rate table: status_transaksi ENUM → VARCHAR(255)
       await connection.execute(`
         ALTER TABLE app_success_rate 
-        MODIFY COLUMN status_transaksi ENUM('sukses', 'failed', 'pending', 'suspect', 'cancelled')
+        MODIFY COLUMN status_transaksi VARCHAR(255) NULL
       `)
 
-      // Update unmapped_rc table ENUM
+      // Update app_success_rate table: rc dan error_type boleh NULL
+      await connection.execute(`
+        ALTER TABLE app_success_rate 
+        MODIFY COLUMN rc VARCHAR(50) NULL,
+        MODIFY COLUMN error_type ENUM('S', 'N', 'Sukses') NULL
+      `)
+
+      // Update app_success_rate table: tanggal_transaksi, bulan, tahun, jenis_transaksi WAJIB
+      await connection.execute(`
+        ALTER TABLE app_success_rate 
+        MODIFY COLUMN tanggal_transaksi DATE NOT NULL,
+        MODIFY COLUMN bulan VARCHAR(20) NOT NULL,
+        MODIFY COLUMN tahun INT NOT NULL,
+        MODIFY COLUMN jenis_transaksi VARCHAR(255) NOT NULL
+      `)
+
+      // Update unmapped_rc table: status_transaksi ENUM → VARCHAR(255)
       await connection.execute(`
         ALTER TABLE unmapped_rc 
-        MODIFY COLUMN status_transaksi ENUM('sukses', 'failed', 'pending', 'suspect', 'cancelled')
+        MODIFY COLUMN status_transaksi VARCHAR(255) NULL
       `)
 
       console.log('✅ Database schema migrated successfully!')
       
       return NextResponse.json({
         success: true,
-        message: 'Database schema migrated successfully. ENUM status_transaksi has been updated to include "suspect" and "cancelled".',
+        message: 'Database schema migrated successfully. status_transaksi changed to VARCHAR(255), rc and error_type can be NULL, and required fields updated.',
       } as ApiResponse)
     } catch (error: any) {
       console.error('Error migrating database schema:', error.message)

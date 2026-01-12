@@ -431,8 +431,7 @@ export default function DictionaryCard() {
           <button
             type="button"
             onClick={() => {
-              setCurrentPage(1)
-              loadDictionary(1, false)
+              loadDictionary(currentPage, false)
             }}
             className="px-2 py-1.5 rounded-md font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-blue-600 to-blue-800 text-white hover:from-blue-700 hover:to-blue-900 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-1"
             title="Refresh data"
@@ -879,7 +878,6 @@ export default function DictionaryCard() {
             onClick={() => {
               const newPage = Math.max(1, currentPage - 1)
               setCurrentPage(newPage)
-              loadDictionary(newPage, false)
             }}
             disabled={currentPage === 1}
             className="px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-300 flex items-center gap-1"
@@ -951,7 +949,6 @@ export default function DictionaryCard() {
                     type="button"
                     onClick={() => {
                       setCurrentPage(pageNum)
-                      loadDictionary(pageNum, false)
                     }}
                     className={`px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 min-w-[28px] ${
                       currentPage === pageNum
@@ -971,7 +968,6 @@ export default function DictionaryCard() {
             onClick={() => {
               const newPage = Math.min(totalPages, currentPage + 1)
               setCurrentPage(newPage)
-              loadDictionary(newPage, false)
             }}
             disabled={currentPage === totalPages}
             className="px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-300 flex items-center gap-1"

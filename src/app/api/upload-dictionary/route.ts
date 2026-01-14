@@ -186,6 +186,15 @@ export async function POST(request: NextRequest) {
           ? (row[rcDescriptionIndex] || '').trim() 
           : null
 
+        // Basic validation - skip completely empty rows (hanya cek apakah ada data)
+        const hasData = jenisTransaksi !== '' || rc !== ''
+
+        if (!hasData) {
+          // Skip empty rows silently (tidak perlu ditambahkan ke skippedRows)
+          // karena ini adalah rows kosong di akhir file yang normal
+          continue
+        }
+
         // Map S/N values to error_type
           let errorType: 'S' | 'N' | 'Sukses' | null = null
         if (rawSn === 'S') {
@@ -287,6 +296,8 @@ export async function POST(request: NextRequest) {
 
         // Collect data from rows (skip header row)
         dictionaryData = []
+        let consecutiveEmptyRows = 0
+        const MAX_CONSECUTIVE_EMPTY = 10 // Stop jika 10 rows berturut-turut kosong
 
         for (let rowNum = 1; rowNum <= range.e.r; rowNum++) {
         const actualRowNumber = rowNum + 1 // +1 karena rowNum dimulai dari 1 (skip header), tapi user melihat dari row 2
@@ -309,6 +320,23 @@ export async function POST(request: NextRequest) {
           const rcDescription = rcDescriptionCell && rcDescriptionCell.v
             ? String(rcDescriptionCell.v).trim()
             : null
+
+        // Basic validation - skip completely empty rows (hanya cek apakah ada data)
+        const hasData = jenisTransaksi !== '' || rc !== ''
+
+        if (!hasData) {
+          consecutiveEmptyRows++
+          // Jika banyak rows kosong berturut-turut, kemungkinan sudah sampai akhir data
+          // Stop loop untuk menghindari memproses ribuan empty rows
+          if (consecutiveEmptyRows >= MAX_CONSECUTIVE_EMPTY) {
+            break
+          }
+          // Skip empty rows silently (tidak perlu ditambahkan ke skippedRows)
+          continue
+        }
+
+        // Reset counter jika menemukan data
+        consecutiveEmptyRows = 0
 
         // Map S/N values to error_type
           let errorType: 'S' | 'N' | 'Sukses' | null = null

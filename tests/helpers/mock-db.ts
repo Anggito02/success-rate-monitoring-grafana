@@ -8,11 +8,11 @@ import { vi } from 'vitest'
  *
  * Override individual calls per-test:
  *
- *   mockDb.execute.mockResolvedValueOnce({ rows: [...] })
+ *   mockDb.execute.mockResolvedValueOnce([...])
  */
 export function createMockDb() {
   const chainable = {
-    execute: vi.fn().mockResolvedValue({ rows: [] }),
+    execute: vi.fn().mockResolvedValue([]),
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),

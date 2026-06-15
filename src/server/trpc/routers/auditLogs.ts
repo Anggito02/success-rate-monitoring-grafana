@@ -94,11 +94,11 @@ export const auditLogsRouter = router({
       return {
         success: true,
         data: {
-          total: Number(totalResult.rows[0]?.total ?? 0),
-          actionCounts: actionCounts.rows || [],
-          resourceTypeCounts: resourceTypeCounts.rows || [],
-          dailyActivity: dailyActivity.rows || [],
-          topUsers: topUsers.rows || [],
+          total: Number((totalResult[0] as any)?.total ?? 0),
+          actionCounts: actionCounts as any[],
+          resourceTypeCounts: resourceTypeCounts as any[],
+          dailyActivity: dailyActivity as any[],
+          topUsers: topUsers as any[],
         },
       }
     }),

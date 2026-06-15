@@ -61,7 +61,6 @@ function JobsPage() {
                   <TableHead className="hidden md:table-cell">ID</TableHead>
                   <TableHead className="hidden lg:table-cell">Kind</TableHead>
                   <TableHead className="hidden lg:table-cell">Output table</TableHead>
-                  <TableHead className="hidden md:table-cell">Schedule (env)</TableHead>
                   <TableHead className="text-right">Run</TableHead>
                 </TableRow>
               </TableHeader>
@@ -88,14 +87,6 @@ function JobsPage() {
                       </TableCell>
                       <TableCell className="hidden font-mono text-xs text-muted-foreground lg:table-cell">
                         {row.outputTable}
-                      </TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                        {row.scheduleEnvVar ?? '—'}
-                        {(row as { scheduleCronResolved?: string }).scheduleCronResolved && (
-                          <span className="block font-mono">
-                            {(row as { scheduleCronResolved?: string }).scheduleCronResolved}
-                          </span>
-                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {/* biome-ignore lint/a11y/useKeyWithClickEvents: stops row-expand toggle only */}

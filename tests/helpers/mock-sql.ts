@@ -1,32 +1,32 @@
 /**
- * Fake pg.Pool for testing `applyFdwConfig` without a live database.
+ * Fake postgres-js Sql for testing `applyFdwConfig` without a live database.
  *
  * Responses are queued in order via `enqueue()`.  If the queue is empty a
- * default `{ rows: [] }` is returned.  Errors are injected the same way via
+ * default `[]` is returned.  Errors are injected the same way via
  * `enqueueError()`.  All emitted SQL strings are recorded in `getQueries()`.
  */
-export class MockPool {
+export class MockSql {
   private calls: string[] = []
   private queue: (Record<string, unknown>[] | Error)[] = []
 
-  /** Queue rows to be returned by the next call(s) to `query`. */
+  /** Queue rows to be returned by the next call(s) to `unsafe`. */
   enqueue(rows: Record<string, unknown>[]) {
     this.queue.push(rows)
   }
 
-  /** Queue an error to be thrown by the next call to `query`. */
+  /** Queue an error to be thrown by the next call to `unsafe`. */
   enqueueError(err: Error | string) {
     this.queue.push(typeof err === 'string' ? new Error(err) : err)
   }
 
-  async query(sql: string): Promise<{ rows: Record<string, unknown>[] }> {
+  async unsafe(sql: string): Promise<Record<string, unknown>[]> {
     this.calls.push(sql.trim())
     if (this.queue.length > 0) {
       const next = this.queue.shift()!
       if (next instanceof Error) throw next
-      return { rows: next }
+      return next
     }
-    return { rows: [] }
+    return []
   }
 
   getQueries(): string[] {

@@ -11,6 +11,7 @@ import {
   ReceiptText,
   ScrollText,
   Server,
+  Settings,
   Timer,
   Trash2,
   Upload,
@@ -39,6 +40,7 @@ const workspaceNav = [
   { title: 'Uploads', to: '/uploads', icon: Upload },
   { title: 'Transactions', to: '/transactions', icon: ReceiptText },
   { title: 'Docs', to: '/docs', icon: FileText },
+  { title: 'Settings', to: '/settings', icon: Settings },
 ] as const
 
 const superadminNav = [

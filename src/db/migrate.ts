@@ -25,9 +25,10 @@ import { randomUUID } from 'node:crypto'
 import argon2 from '@node-rs/argon2'
 import { runRecapModelStoredProcedures } from '@scripts/recap_models/runProcedures'
 import { type SQL, sql } from 'drizzle-orm'
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { runStoredProcedures as runProcedures } from '../../scripts/success_rate/runProcedures'
 import { applyFdwConfig } from '../lib/fdw-setup'
+import { SEED_JOBS } from './seed-schedules'
 
 // ─── Argument parsing ───────────────────────────────────────────────────────
 
@@ -51,35 +52,33 @@ const DB_NAME = process.env.DB_NAME ?? 'platform_db'
 
 // ─── Low-level query executor (drizzle) ──────────────────────────────────────
 
-let migrationDb!: NodePgDatabase
-let migrationPool!: import('pg').Pool
+let migrationDb!: PostgresJsDatabase
+let migrationClient!: import('postgres').Sql
 let closeDb!: () => Promise<void>
 
 async function initConnection() {
-  const { Pool } = await import('pg')
-  const { drizzle } = await import('drizzle-orm/node-postgres')
-  const pool = new Pool({
+  const postgres = (await import('postgres')).default
+  const { drizzle } = await import('drizzle-orm/postgres-js')
+  const client = postgres({
     host: DB_HOST,
     port: DB_PORT,
-    user: DB_USER,
+    username: DB_USER,
     password: DB_PASSWORD,
     database: DB_NAME,
   })
-  migrationPool = pool
-  migrationDb = drizzle(pool)
-  closeDb = () => pool.end()
+  migrationClient = client
+  migrationDb = drizzle(client)
+  closeDb = () => client.end()
 }
 
 /** Run a raw (param-less) DDL/SQL string through drizzle. */
 async function exec(text: string): Promise<unknown[]> {
-  const result = await migrationDb.execute(sql.raw(text))
-  return result.rows
+  return (await migrationDb.execute(sql.raw(text))) as unknown as unknown[]
 }
 
 /** Run a parameterized drizzle `sql` template. */
 async function execSql(query: SQL): Promise<unknown[]> {
-  const result = await migrationDb.execute(query)
-  return result.rows
+  return (await migrationDb.execute(query)) as unknown as unknown[]
 }
 
 // ─── Safety helpers ──────────────────────────────────────────────────────────
@@ -779,7 +778,7 @@ async function runPerformanceIndexes() {
 
 async function runFdwSetup() {
   console.log('\n🔗 Phase 4b: postgres_fdw setup')
-  const result = await applyFdwConfig(migrationPool)
+  const result = await applyFdwConfig(migrationClient)
   for (const err of result.errors) {
     console.warn(`  ⚠️  ${err}`)
   }
@@ -1015,81 +1014,6 @@ async function runSeeds() {
 
 // ─── Phase 8: Scheduler jobs table + seed ────────────────────────────────────
 
-const SEED_JOBS: { name: string; procedure: string; envVar: string; defaultSchedule: string }[] = [
-  {
-    name: 'BALE processing',
-    procedure: 'sp_process_bale_daily',
-    envVar: 'BALE_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'Bale Bisnis processing',
-    procedure: 'sp_process_bale_bisnis_daily',
-    envVar: 'BALE_BISNIS_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'OLOB processing',
-    procedure: 'sp_process_olob_daily',
-    envVar: 'OLOB_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'CMS processing',
-    procedure: 'sp_process_cms_daily',
-    envVar: 'CMS_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'CMS CORP recap',
-    procedure: 'sp_recap_cms_corp_daily',
-    envVar: 'CMS_CORP_RECAP_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'Bale Korpora CORP recap',
-    procedure: 'sp_recap_bale_korpora_corp_daily',
-    envVar: 'BALE_KORPORA_CORP_RECAP_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'Bale Korpora processing',
-    procedure: 'sp_process_bale_korpora_daily',
-    envVar: 'BALE_KORPORA_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'EDC Agen processing',
-    procedure: 'sp_process_edc_agen_daily',
-    envVar: 'EDC_AGEN_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'EDC Merchant processing',
-    procedure: 'sp_process_edc_merchant_daily',
-    envVar: 'EDC_MERCHANT_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'EDC Merchant Ancol processing',
-    procedure: 'sp_process_edc_merchant_ancol_daily',
-    envVar: 'EDC_MERCHANT_ANCOL_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'Debit Online processing',
-    procedure: 'sp_process_debit_online_daily',
-    envVar: 'DEBIT_ONLINE_PROCESSING_SCHEDULE',
-    defaultSchedule: '1 0 * * *',
-  },
-  {
-    name: 'Housekeeping',
-    procedure: 'sp_run_raw_housekeeping',
-    envVar: 'HOUSEKEEPING_SCHEDULE',
-    defaultSchedule: '0 2 * * *',
-  },
-]
-
 async function runCronSetup() {
   console.log('\n⏰ Phase 8: Scheduler jobs table')
 
@@ -1115,7 +1039,7 @@ async function runCronSetup() {
   }
 
   for (const job of SEED_JOBS) {
-    const schedule = (process.env[job.envVar] ?? job.defaultSchedule).trim()
+    const schedule = job.defaultSchedule.trim()
     await exec(`
       INSERT INTO "scheduler_jobs" ("name", "procedure", "schedule")
       VALUES ('${job.name.replace(/'/g, "''")}', '${job.procedure}', '${schedule.replace(/'/g, "''")}')

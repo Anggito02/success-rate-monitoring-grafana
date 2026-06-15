@@ -28,20 +28,6 @@ const serverSchema = z.object({
 
   // Scheduler
   SCHEDULER_TIMEZONE: z.string().default('Asia/Jakarta'),
-  BALE_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  BALE_BISNIS_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  OLOB_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  EDC_AGEN_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  EDC_MERCHANT_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  EDC_MERCHANT_ANCOL_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  CMS_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  BALE_KORPORA_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  CMS_CORP_RECAP_SCHEDULE: z.string().default('1 0 * * *'),
-  BALE_KORPORA_CORP_RECAP_SCHEDULE: z.string().default('1 0 * * *'),
-  HOUSEKEEPING_SCHEDULE: z.string().default('0 2 * * *'),
-
-  /** Optional: allows tRPC `recap.triggerExternal` without session when x-recap-api-key matches */
-  RECAP_TRIGGER_API_KEY: z.string().optional(),
 
   // Migrations / seeds
   TARGET_DATABASES: z.string().optional(),

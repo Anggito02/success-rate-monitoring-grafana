@@ -17,14 +17,14 @@ export class RecapValidationError extends Error {
 async function resolveTargetDate(dateParam: string | null): Promise<string> {
   if (dateParam) return dateParam
   const result = await db.execute(sql`SELECT (CURRENT_DATE - INTERVAL '1 day')::date::text AS d`)
-  const row = result.rows[0] as Record<string, unknown> | undefined
+  const row = result[0] as Record<string, unknown> | undefined
   const d = row?.d ?? row?.D
   return String(d ?? '').slice(0, 10)
 }
 
 async function validatePastDate(dateStr: string): Promise<void> {
   const todayResult = await db.execute(sql`SELECT CURRENT_DATE::text AS today`)
-  const todayStr = String((todayResult.rows[0] as any)?.today ?? '')
+  const todayStr = String((todayResult[0] as any)?.today ?? '')
     .split('T')[0]
     .slice(0, 10)
   if (dateStr >= todayStr) {
@@ -43,7 +43,7 @@ async function resolveAppForEntry(
   if (!appKey) throw new RecapValidationError('Invalid catalog entry scope', 'NOT_FOUND')
 
   const result = await db.execute(sql`SELECT id, app_name FROM app_identifier`)
-  const list = result.rows as { id: number; app_name: string }[]
+  const list = result as unknown as { id: number; app_name: string }[]
   const row = list.find((r) => normalizeAppNameToKey(r.app_name) === appKey)
   if (!row) {
     throw new RecapValidationError(`Application for key "${appKey}" not found in app_identifier`, 'NOT_FOUND')
@@ -87,7 +87,7 @@ export async function triggerRecap(params: TriggerRecapParams): Promise<TriggerR
     ORDER BY created_at DESC
     LIMIT 1
   `)
-  const log = logResult.rows[0] as Record<string, unknown> | undefined
+  const log = logResult[0] as Record<string, unknown> | undefined
 
   const logEntry = log
     ? {

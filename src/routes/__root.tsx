@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes'
 import type { ReactNode } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { queryClient, trpc, trpcClient } from '@/router'
+import { BackgroundModeProvider } from '@/hooks/use-background-mode'
 import '@/styles/app.css'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -23,11 +24,27 @@ function RootComponent() {
     <RootDocument>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            <TooltipProvider>
-              <Outlet />
-              <Toaster richColors position="bottom-right" />
-            </TooltipProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            themes={['latte', 'frappe', 'macchiato', 'mocha']}
+            value={{
+              light: 'latte',
+              dark: 'mocha',
+              latte: 'latte',
+              frappe: 'frappe',
+              macchiato: 'macchiato',
+              mocha: 'mocha',
+            }}
+          >
+            <BackgroundModeProvider>
+              <TooltipProvider>
+                <Outlet />
+                <Toaster richColors position="bottom-right" />
+              </TooltipProvider>
+            </BackgroundModeProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </trpc.Provider>

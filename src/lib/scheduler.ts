@@ -2,19 +2,16 @@
  * Scheduler – node-cron v4 based
  *
  * Each job invokes a PostgreSQL stored procedure via Drizzle.
- * Schedules are configurable via environment variables or
- * passed in directly (for DB-driven scheduling).
+ * Schedules are passed in directly (DB-driven) or fall back to DEFAULT_SCHEDULE.
  */
 
 export interface RecapJobInput {
   id?: number
   /** Human-readable name used in log lines */
   name: string
-  /** Environment variable holding the cron schedule (fallback) */
-  envVar?: string
   /** Stored procedure to invoke (in the `public` schema) */
   procedure: string
-  /** Direct cron schedule (takes precedence over envVar) */
+  /** Direct cron schedule */
   schedule?: string
   /** Timezone override */
   timezone?: string
@@ -23,25 +20,13 @@ export interface RecapJobInput {
 const DEFAULT_SCHEDULE = '1 0 * * *'
 
 const RECAP_JOBS: RecapJobInput[] = [
-  { name: 'BALE processing', envVar: 'BALE_PROCESSING_SCHEDULE', procedure: 'sp_process_bale_daily' },
-  {
-    name: 'Bale Bisnis processing',
-    envVar: 'BALE_BISNIS_PROCESSING_SCHEDULE',
-    procedure: 'sp_process_bale_bisnis_daily',
-  },
-  { name: 'OLOB processing', envVar: 'OLOB_PROCESSING_SCHEDULE', procedure: 'sp_process_olob_daily' },
-  { name: 'CMS processing', envVar: 'CMS_PROCESSING_SCHEDULE', procedure: 'sp_process_cms_daily' },
-  { name: 'CMS CORP recap', envVar: 'CMS_CORP_RECAP_SCHEDULE', procedure: 'sp_recap_cms_corp_daily' },
-  {
-    name: 'Bale Korpora CORP recap',
-    envVar: 'BALE_KORPORA_CORP_RECAP_SCHEDULE',
-    procedure: 'sp_recap_bale_korpora_corp_daily',
-  },
-  {
-    name: 'Bale Korpora processing',
-    envVar: 'BALE_KORPORA_PROCESSING_SCHEDULE',
-    procedure: 'sp_process_bale_korpora_daily',
-  },
+  { name: 'BALE processing', procedure: 'sp_process_bale_daily' },
+  { name: 'Bale Bisnis processing', procedure: 'sp_process_bale_bisnis_daily' },
+  { name: 'OLOB processing', procedure: 'sp_process_olob_daily' },
+  { name: 'CMS processing', procedure: 'sp_process_cms_daily' },
+  { name: 'CMS CORP recap', procedure: 'sp_recap_cms_corp_daily' },
+  { name: 'Bale Korpora CORP recap', procedure: 'sp_recap_bale_korpora_corp_daily' },
+  { name: 'Bale Korpora processing', procedure: 'sp_process_bale_korpora_daily' },
 ]
 
 const runningTasks = new Map<string, { stop: () => void }>()
@@ -78,7 +63,7 @@ export async function initializeScheduler(jobs?: RecapJobInput[]): Promise<void>
   }
 
   const jobsToRun = jobs ?? RECAP_JOBS
-  console.log(`ℹ️  Initializing scheduler (${jobsToRun.length} jobs)...`)
+  console.log(`ℹ️  Initializing scheduler (${jobsToRun.length} jobs — DB-driven via scheduler_jobs)...`)
   const defaultTimezone = process.env.SCHEDULER_TIMEZONE ?? 'Asia/Jakarta'
 
   for (const job of jobsToRun) {
@@ -86,7 +71,7 @@ export async function initializeScheduler(jobs?: RecapJobInput[]): Promise<void>
     if (runningTasks.has(key)) continue
 
     const timezone = job.timezone ?? defaultTimezone
-    let schedule = (job.schedule ?? process.env[job.envVar ?? ''] ?? DEFAULT_SCHEDULE).trim()
+    let schedule = (job.schedule ?? DEFAULT_SCHEDULE).trim()
     if (!cron.validate(schedule)) {
       console.warn(`⚠️  Invalid cron schedule for ${job.name}: '${schedule}'. Using default: '${DEFAULT_SCHEDULE}'`)
       schedule = DEFAULT_SCHEDULE

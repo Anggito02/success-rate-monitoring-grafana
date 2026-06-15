@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import { sql } from 'drizzle-orm'
-import { Pool } from 'pg'
+import postgres from 'postgres'
 import { z } from 'zod'
 import { db } from '@/db'
 import { env } from '@/env'
@@ -8,31 +8,31 @@ import { logAuditEvent } from '@/lib/audit'
 import { applyFdwConfig } from '@/lib/fdw-setup'
 import { router, superAdminProcedure } from '../init'
 
-function createFdwPool(): Pool {
-  return new Pool({
+function createFdwClient() {
+  return postgres({
     host: env.DB_HOST,
     port: env.DB_PORT,
-    user: env.DB_USER,
+    username: env.DB_USER,
     password: env.DB_PASSWORD,
     database: env.DB_NAME,
   })
 }
 
 async function runFdwApply() {
-  const pool = createFdwPool()
+  const client = createFdwClient()
   try {
-    return await applyFdwConfig(pool)
+    return await applyFdwConfig(client)
   } finally {
-    await pool.end()
+    await client.end()
   }
 }
 
 export const fdwRouter = router({
   list: superAdminProcedure.query(async () => {
-    const result = await db.execute(
+    const rows = await db.execute(
       sql`SELECT id, source_db_name, table_name, schema_name, created_at FROM fdw_source_table ORDER BY source_db_name, table_name`,
     )
-    return { success: true, data: { fdwSources: result.rows as any[] } }
+    return { success: true, data: { fdwSources: rows as any[] } }
   }),
 
   add: superAdminProcedure
@@ -73,15 +73,14 @@ export const fdwRouter = router({
     }),
 
   remove: superAdminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
-    const result = await db.execute(sql`
+    const rows = await db.execute(sql`
         SELECT source_db_name, table_name FROM fdw_source_table WHERE id = ${input.id}
       `)
-    const rows = result.rows as any[]
     if (rows.length === 0) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'FDW source not found' })
     }
     await db.execute(sql`DELETE FROM fdw_source_table WHERE id = ${input.id}`)
-    const row = rows[0]
+    const row = rows[0] as any
     await logAuditEvent(
       ctx.session.userId,
       ctx.session.username,

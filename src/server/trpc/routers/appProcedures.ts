@@ -16,7 +16,7 @@ export const appProceduresRouter = router({
         WHERE id_app_identifier = ${input.appId}
         ORDER BY created_at
       `)
-    return { success: true, data: { procedures: result.rows as any[] } }
+    return { success: true, data: { procedures: result as any[] } }
   }),
 
   register: superAdminProcedure
@@ -79,7 +79,7 @@ export const appProceduresRouter = router({
           updated_at        = NOW()
         RETURNING id
       `)
-      const id = (upsertResult.rows[0] as any)?.id
+      const id = (upsertResult[0] as any)?.id
 
       await logAuditEvent(
         ctx.session.userId,
@@ -98,7 +98,7 @@ export const appProceduresRouter = router({
       await db.execute(sql`
           SELECT function_name FROM app_custom_procedure WHERE id = ${input.id}
         `)
-    ).rows[0] as { function_name: string } | undefined
+    )[0] as { function_name: string } | undefined
 
     if (!row) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Procedure not found' })

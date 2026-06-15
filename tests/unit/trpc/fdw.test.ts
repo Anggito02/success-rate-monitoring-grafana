@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockDb = vi.hoisted(() => ({
-  execute: vi.fn().mockResolvedValue({ rows: [] }),
+  execute: vi.fn().mockResolvedValue([]),
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
@@ -37,7 +37,7 @@ describe('fdw.add', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockApplyFdwConfig.mockResolvedValue({ serversProcessed: 1, tablesProcessed: 1, errors: [] })
-    mockDb.execute.mockResolvedValue({ rows: [] })
+    mockDb.execute.mockResolvedValue([])
   })
 
   it('F10 — throws CONFLICT when FDW source already exists (pg 23505)', async () => {
@@ -57,13 +57,13 @@ describe('fdw.add', () => {
   })
 
   it('calls applyFdwConfig after inserting new source', async () => {
-    mockDb.execute.mockResolvedValueOnce({ rows: [] })
+    mockDb.execute.mockResolvedValueOnce([])
     await makeSuperadminCaller().add({ source_db_name: 'new_db', table_name: 'new_table' })
     expect(mockApplyFdwConfig).toHaveBeenCalledOnce()
   })
 
   it('reports partial errors from applyFdwConfig in the response', async () => {
-    mockDb.execute.mockResolvedValueOnce({ rows: [] })
+    mockDb.execute.mockResolvedValueOnce([])
     mockApplyFdwConfig.mockResolvedValueOnce({
       serversProcessed: 1,
       tablesProcessed: 0,

@@ -1,4 +1,4 @@
-import type { Pool } from 'pg'
+import type { Sql } from 'postgres'
 import { fdwLocalRelationName } from './fdw'
 
 export interface FdwSetupResult {
@@ -13,7 +13,7 @@ export interface FdwSetupResult {
  * Drops and recreates foreign servers, user mappings, foreign tables,
  * and compatibility views for every row in fdw_source_table.
  */
-export async function applyFdwConfig(pool: Pool): Promise<FdwSetupResult> {
+export async function applyFdwConfig(sqlClient: Sql): Promise<FdwSetupResult> {
   const result: FdwSetupResult = { serversProcessed: 0, tablesProcessed: 0, errors: [] }
 
   const DB_HOST = process.env.DB_HOST ?? 'localhost'
@@ -23,8 +23,7 @@ export async function applyFdwConfig(pool: Pool): Promise<FdwSetupResult> {
   const DB_USER_TARGET = process.env.DB_USER_TARGET?.trim() || null
 
   async function exec(text: string): Promise<unknown[]> {
-    const res = await pool.query(text)
-    return res.rows
+    return await sqlClient.unsafe(text)
   }
 
   async function tableExists(table: string): Promise<boolean> {

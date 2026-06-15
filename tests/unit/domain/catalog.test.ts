@@ -47,16 +47,6 @@ describe('buildRecapCatalog', () => {
     }
   })
 
-  it('sr:bale maps correct scheduleEnvVar', () => {
-    const e = buildRecapCatalog().find((x) => x.id === 'sr:bale')!
-    expect(e.scheduleEnvVar).toBe('BALE_PROCESSING_SCHEDULE')
-  })
-
-  it('sr:cms maps correct scheduleEnvVar', () => {
-    const e = buildRecapCatalog().find((x) => x.id === 'sr:cms')!
-    expect(e.scheduleEnvVar).toBe('CMS_PROCESSING_SCHEDULE')
-  })
-
   it('cms_corp_daily uses sp_recap_cms_corp_daily', () => {
     const e = buildRecapCatalog().find((x) => x.id === 'cms_corp_daily')!
     expect(e.functionName).toBe('sp_recap_cms_corp_daily')

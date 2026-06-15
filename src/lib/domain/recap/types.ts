@@ -16,7 +16,6 @@ export type RecapCatalogEntry = {
   briefQuery: string;
   outputTable: string;
   functionName: string;
-  scheduleEnvVar: string | null;
   /** Repo-relative path to raw SQL documentation */
   rawSqlRepoPath: string;
   scope: RecapScope;

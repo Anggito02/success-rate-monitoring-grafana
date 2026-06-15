@@ -9,8 +9,8 @@
 
 import 'dotenv/config'
 import { eq } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
 import { schedulerJobs } from '../db/schema/scheduler'
 
 const DB_HOST = process.env.DB_HOST ?? 'localhost'
@@ -19,14 +19,14 @@ const DB_USER = process.env.DB_USER ?? 'root'
 const DB_PASSWORD = process.env.DB_PASSWORD ?? ''
 const DB_NAME = process.env.DB_NAME ?? 'platform_db'
 
-const pool = new Pool({
+const client = postgres({
   host: DB_HOST,
   port: DB_PORT,
-  user: DB_USER,
+  username: DB_USER,
   password: DB_PASSWORD,
   database: DB_NAME,
 })
-const db = drizzle(pool)
+const db = drizzle(client)
 
 const runningTasks = new Map<number, { stop: () => void }>()
 let currentJobs: (typeof schedulerJobs.$inferSelect)[] = []
@@ -133,14 +133,14 @@ process.on('message', async (msg: string) => {
 process.on('SIGTERM', async () => {
   console.log('[scheduler-worker] SIGTERM received, shutting down...')
   await stopAll()
-  await pool.end()
+  await client.end()
   process.exit(0)
 })
 
 process.on('SIGINT', async () => {
   console.log('[scheduler-worker] SIGINT received, shutting down...')
   await stopAll()
-  await pool.end()
+  await client.end()
   process.exit(0)
 })
 

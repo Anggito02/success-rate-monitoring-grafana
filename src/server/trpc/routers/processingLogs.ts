@@ -103,7 +103,7 @@ export const processingLogsRouter = router({
            )
          ORDER BY processing_date DESC, created_at DESC
       `)
-      return { success: true, data: (result.rows ?? []) as any[] }
+      return { success: true, data: result as any[] }
     }),
 
   processManual: superAdminProcedure

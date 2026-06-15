@@ -13,7 +13,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Textarea } from '@/components/ui/textarea'
+import { SqlEditor } from '@/components/ui/sql-editor'
 import { trpc } from '@/router'
 import { formatDate, useSuperadminGuard } from './-shared'
 
@@ -448,10 +448,11 @@ function AppConfigPage() {
                             </Button>
                           </div>
                           <FormControl>
-                            <Textarea
-                              className="min-h-48 font-mono text-xs"
+                            <SqlEditor
+                              value={field.value}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
                               placeholder="CREATE OR REPLACE FUNCTION public.sp_process_myapp_daily(p_processing_date DATE DEFAULT NULL) RETURNS void AS $$ ..."
-                              {...field}
                             />
                           </FormControl>
                           <FormDescription>

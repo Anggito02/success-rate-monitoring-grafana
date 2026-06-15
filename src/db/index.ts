@@ -1,20 +1,21 @@
-import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres'
-import { Pool as PgPool } from 'pg'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
 import { env } from '@/env'
 import * as pgSchema from './schema'
 
 function createPgDb() {
-  const pool = new PgPool({
+  const client = postgres({
     host: env.DB_HOST,
     port: env.DB_PORT,
-    user: env.DB_USER,
+    username: env.DB_USER,
     password: env.DB_PASSWORD,
     database: env.DB_NAME,
     max: 10,
-    idleTimeoutMillis: 600000,
-    connectionTimeoutMillis: 600000,
+    idle_timeout: 600,
+    connect_timeout: 600,
   })
-  return drizzlePg(pool, { schema: pgSchema })
+  return drizzle(client, { schema: pgSchema })
 }
 
 declare global {
@@ -31,7 +32,7 @@ function getDb() {
 
 export const db = getDb()
 
-export type PgDB = ReturnType<typeof createPgDb>
+export type PgDB = PostgresJsDatabase<typeof pgSchema>
 export type DB = PgDB
 
 export { pgSchema }

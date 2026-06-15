@@ -15,9 +15,6 @@ const serverSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(1),
   BETTER_AUTH_URL: z.url(),
   SCHEDULER_TIMEZONE: z.string().default('Asia/Jakarta'),
-  BALE_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  CMS_PROCESSING_SCHEDULE: z.string().default('1 0 * * *'),
-  HOUSEKEEPING_SCHEDULE: z.string().default('0 2 * * *'),
 })
 
 const validBase = {
@@ -49,16 +46,6 @@ describe('server env schema', () => {
   it('defaults SCHEDULER_TIMEZONE to Asia/Jakarta', () => {
     const result = serverSchema.parse(validBase)
     expect(result.SCHEDULER_TIMEZONE).toBe('Asia/Jakarta')
-  })
-
-  it('defaults BALE_PROCESSING_SCHEDULE to "1 0 * * *"', () => {
-    const result = serverSchema.parse(validBase)
-    expect(result.BALE_PROCESSING_SCHEDULE).toBe('1 0 * * *')
-  })
-
-  it('defaults HOUSEKEEPING_SCHEDULE to "0 2 * * *"', () => {
-    const result = serverSchema.parse(validBase)
-    expect(result.HOUSEKEEPING_SCHEDULE).toBe('0 2 * * *')
   })
 
   it('throws when DB_HOST is missing', () => {

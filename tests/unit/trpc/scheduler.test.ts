@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockDb = vi.hoisted(() => ({
-  execute: vi.fn().mockResolvedValue({ rows: [] }),
+  execute: vi.fn().mockResolvedValue([]),
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),

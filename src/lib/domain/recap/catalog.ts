@@ -17,18 +17,6 @@ const DISPLAY_APP: Record<string, string> = {
   debit_online: 'Debit Online',
 }
 
-const SCHEDULE_ENV: Record<string, string> = {
-  bale: 'BALE_PROCESSING_SCHEDULE',
-  bale_bisnis: 'BALE_BISNIS_PROCESSING_SCHEDULE',
-  olob: 'OLOB_PROCESSING_SCHEDULE',
-  edc_agen: 'EDC_AGEN_PROCESSING_SCHEDULE',
-  edc_merchant: 'EDC_MERCHANT_PROCESSING_SCHEDULE',
-  edc_merchant_ancol: 'EDC_MERCHANT_ANCOL_PROCESSING_SCHEDULE',
-  cms: 'CMS_PROCESSING_SCHEDULE',
-  bale_korpora: 'BALE_KORPORA_PROCESSING_SCHEDULE',
-  debit_online: 'DEBIT_ONLINE_PROCESSING_SCHEDULE',
-}
-
 const BRIEF_SUCCESS_RATE: Record<string, string> = {
   bale: 'FROM raw_bale: aggregate by day, jenis, RC, status; map dictionary error_type; INSERT app_success_rate.',
   bale_bisnis: 'FROM raw_bale_bisnis: matrix-style aggregate; INSERT app_success_rate (see raw.postgres.sql).',
@@ -51,7 +39,6 @@ function successRateEntries(): RecapCatalogEntry[] {
     briefQuery: BRIEF_SUCCESS_RATE[appKey] ?? 'See scripts/success_rate/{app}/raw.postgres.sql in the repository.',
     outputTable: 'app_success_rate',
     functionName: procedureName,
-    scheduleEnvVar: SCHEDULE_ENV[appKey] ?? null,
     rawSqlRepoPath: `scripts/success_rate/${appKey}/raw.postgres.sql`,
     scope: { type: 'per_app', appKey },
   }))
@@ -82,7 +69,6 @@ function customRecapEntries(): RecapCatalogEntry[] {
         briefQuery: CMS_CORP_BRIEF_QUERY,
         outputTable: 'recap_cms_corp_daily',
         functionName: m.functionName,
-        scheduleEnvVar: m.scheduleEnvVar,
         rawSqlRepoPath: 'scripts/recap_models/cms_corp_daily/raw.postgres.sql',
         scope: { type: 'fixed_app', appKey: 'cms' },
       })
@@ -98,7 +84,6 @@ function customRecapEntries(): RecapCatalogEntry[] {
         briefQuery: BALE_KORP_CORP_BRIEF_QUERY,
         outputTable: 'recap_bale_korpora_corp_daily',
         functionName: m.functionName,
-        scheduleEnvVar: m.scheduleEnvVar,
         rawSqlRepoPath: 'scripts/recap_models/bale_korpora_corp_daily/raw.postgres.sql',
         scope: { type: 'fixed_app', appKey: 'bale_korpora' },
       })
@@ -129,7 +114,7 @@ async function getDbProcedureEntries(): Promise<RecapCatalogEntry[]> {
       JOIN app_identifier ai ON ai.id = acp.id_app_identifier
       ORDER BY acp.created_at
     `)
-    return (result.rows as any[]).map((row) => ({
+    return (result as any[]).map((row) => ({
       id: `cp:${row.function_name}` as string,
       recapKind: String(row.recap_kind ?? 'success_rate_daily'),
       title: row.description ? String(row.description) : `${row.app_name} — ${row.function_name} (custom)`,
@@ -138,7 +123,6 @@ async function getDbProcedureEntries(): Promise<RecapCatalogEntry[]> {
       briefQuery: `SELECT public.${row.function_name}(p_processing_date::date)`,
       outputTable: String(row.output_table ?? 'app_success_rate'),
       functionName: String(row.function_name),
-      scheduleEnvVar: null,
       rawSqlRepoPath: '',
       scope: {
         type: 'per_app' as const,

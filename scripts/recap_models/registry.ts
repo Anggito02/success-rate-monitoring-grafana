@@ -5,19 +5,15 @@
 export type RecapModelEntry = {
   modelKey: string
   functionName: string
-  /** App scheduler (node-cron) env var for this job */
-  scheduleEnvVar: string
 }
 
 export const RECAP_MODEL_REGISTRY: RecapModelEntry[] = [
   {
     modelKey: 'cms_corp_daily',
     functionName: 'sp_recap_cms_corp_daily',
-    scheduleEnvVar: 'CMS_CORP_RECAP_SCHEDULE',
   },
   {
     modelKey: 'bale_korpora_corp_daily',
     functionName: 'sp_recap_bale_korpora_corp_daily',
-    scheduleEnvVar: 'BALE_KORPORA_CORP_RECAP_SCHEDULE',
   },
 ]

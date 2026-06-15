@@ -16,6 +16,7 @@ import { Route as DashboardIndexRouteImport } from './routes/_dashboard/index'
 import { Route as DashboardUploadsRouteImport } from './routes/_dashboard/uploads'
 import { Route as DashboardUnmappedRcRouteImport } from './routes/_dashboard/unmapped-rc'
 import { Route as DashboardTransactionsRouteImport } from './routes/_dashboard/transactions'
+import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
 import { Route as DashboardDocsRouteImport } from './routes/_dashboard/docs'
 import { Route as DashboardDictionaryRouteImport } from './routes/_dashboard/dictionary'
 import { Route as DashboardApplicationRouteImport } from './routes/_dashboard/application'
@@ -66,6 +67,11 @@ const DashboardUnmappedRcRoute = DashboardUnmappedRcRouteImport.update({
 const DashboardTransactionsRoute = DashboardTransactionsRouteImport.update({
   id: '/transactions',
   path: '/transactions',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardDocsRoute = DashboardDocsRouteImport.update({
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/application': typeof DashboardApplicationRoute
   '/dictionary': typeof DashboardDictionaryRoute
   '/docs': typeof DashboardDocsRouteWithChildren
+  '/settings': typeof DashboardSettingsRoute
   '/transactions': typeof DashboardTransactionsRoute
   '/unmapped-rc': typeof DashboardUnmappedRcRoute
   '/uploads': typeof DashboardUploadsRoute
@@ -193,6 +200,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/application': typeof DashboardApplicationRoute
   '/dictionary': typeof DashboardDictionaryRoute
+  '/settings': typeof DashboardSettingsRoute
   '/transactions': typeof DashboardTransactionsRoute
   '/unmapped-rc': typeof DashboardUnmappedRcRoute
   '/uploads': typeof DashboardUploadsRoute
@@ -220,6 +228,7 @@ export interface FileRoutesById {
   '/_dashboard/application': typeof DashboardApplicationRoute
   '/_dashboard/dictionary': typeof DashboardDictionaryRoute
   '/_dashboard/docs': typeof DashboardDocsRouteWithChildren
+  '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/transactions': typeof DashboardTransactionsRoute
   '/_dashboard/unmapped-rc': typeof DashboardUnmappedRcRoute
   '/_dashboard/uploads': typeof DashboardUploadsRoute
@@ -248,6 +257,7 @@ export interface FileRouteTypes {
     | '/application'
     | '/dictionary'
     | '/docs'
+    | '/settings'
     | '/transactions'
     | '/unmapped-rc'
     | '/uploads'
@@ -271,6 +281,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/application'
     | '/dictionary'
+    | '/settings'
     | '/transactions'
     | '/unmapped-rc'
     | '/uploads'
@@ -297,6 +308,7 @@ export interface FileRouteTypes {
     | '/_dashboard/application'
     | '/_dashboard/dictionary'
     | '/_dashboard/docs'
+    | '/_dashboard/settings'
     | '/_dashboard/transactions'
     | '/_dashboard/unmapped-rc'
     | '/_dashboard/uploads'
@@ -374,6 +386,13 @@ declare module '@tanstack/react-router' {
       path: '/transactions'
       fullPath: '/transactions'
       preLoaderRoute: typeof DashboardTransactionsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/settings': {
+      id: '/_dashboard/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/docs': {
@@ -516,6 +535,7 @@ interface DashboardRouteChildren {
   DashboardApplicationRoute: typeof DashboardApplicationRoute
   DashboardDictionaryRoute: typeof DashboardDictionaryRoute
   DashboardDocsRoute: typeof DashboardDocsRouteWithChildren
+  DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardTransactionsRoute: typeof DashboardTransactionsRoute
   DashboardUnmappedRcRoute: typeof DashboardUnmappedRcRoute
   DashboardUploadsRoute: typeof DashboardUploadsRoute
@@ -536,6 +556,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardApplicationRoute: DashboardApplicationRoute,
   DashboardDictionaryRoute: DashboardDictionaryRoute,
   DashboardDocsRoute: DashboardDocsRouteWithChildren,
+  DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardTransactionsRoute: DashboardTransactionsRoute,
   DashboardUnmappedRcRoute: DashboardUnmappedRcRoute,
   DashboardUploadsRoute: DashboardUploadsRoute,

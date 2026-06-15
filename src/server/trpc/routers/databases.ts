@@ -17,11 +17,11 @@ export const databasesRouter = router({
     const pgDbResult = await db.execute(
       sql`SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn ORDER BY datname`,
     )
-    const datnames = (pgDbResult.rows as { datname: string }[]).map((r) => r.datname)
+    const datnames = (pgDbResult as unknown as { datname: string }[]).map((r) => r.datname)
 
     // 2. Foreign servers provisioned via FDW (naming convention: <dbname>_server)
     const srvResult = await db.execute(sql`SELECT srvname FROM pg_foreign_server`)
-    const foreignServerNames = new Set((srvResult.rows as { srvname: string }[]).map((r) => r.srvname))
+    const foreignServerNames = new Set((srvResult as unknown as { srvname: string }[]).map((r) => r.srvname))
 
     // 3. fdw_source_table counts per source DB (gracefully skip if table doesn't exist yet)
     const sourceCountMap = new Map<string, number>()
@@ -29,7 +29,7 @@ export const databasesRouter = router({
       const fdwResult = await db.execute(
         sql`SELECT source_db_name, count(*)::int AS n FROM fdw_source_table GROUP BY source_db_name`,
       )
-      for (const row of fdwResult.rows as { source_db_name: string; n: number }[]) {
+      for (const row of fdwResult as unknown as { source_db_name: string; n: number }[]) {
         sourceCountMap.set(row.source_db_name, Number(row.n))
       }
     } catch {
